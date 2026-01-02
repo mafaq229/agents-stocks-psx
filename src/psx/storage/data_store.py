@@ -559,13 +559,23 @@ class DataStore:
 
     # ========== AGGREGATE QUERIES ==========
 
-    def get_sector_averages(self, sector: str) -> Dict[str, float]:
-        """Get average metrics for a sector."""
+    def get_sector_averages(self, sector: str) -> Dict[str, Any]:
+        """Get comprehensive average metrics for a sector.
+
+        Returns averages, min/max ranges, and company count for sector benchmarking.
+        """
+        # Get quote-based metrics
         cursor = self.db.execute(
             """
-            SELECT AVG(q.pe_ratio) as avg_pe,
-                   AVG(q.price) as avg_price,
-                   AVG(q.market_cap) as avg_market_cap
+            SELECT
+                COUNT(DISTINCT c.symbol) as company_count,
+                AVG(q.pe_ratio) as avg_pe,
+                MIN(q.pe_ratio) as min_pe,
+                MAX(q.pe_ratio) as max_pe,
+                AVG(q.price) as avg_price,
+                AVG(q.market_cap) as avg_market_cap,
+                AVG(q.change_pct) as avg_change_pct,
+                AVG(q.ytd_change_pct) as avg_ytd_change
             FROM quotes q
             JOIN companies c ON q.company_id = c.id
             WHERE c.sector = ?
@@ -575,8 +585,61 @@ class DataStore:
         )
 
         row = cursor.fetchone()
-        return {
+
+        result = {
+            "sector": sector,
+            "company_count": row["company_count"] or 0,
             "avg_pe": row["avg_pe"],
+            "min_pe": row["min_pe"],
+            "max_pe": row["max_pe"],
             "avg_price": row["avg_price"],
             "avg_market_cap": row["avg_market_cap"],
+            "avg_change_pct": row["avg_change_pct"],
+            "avg_ytd_change": row["avg_ytd_change"],
         }
+
+        # Get profit margin averages from ratios table
+        try:
+            margin_cursor = self.db.execute(
+                """
+                SELECT AVG(r.value) as avg_profit_margin
+                FROM ratios r
+                JOIN companies c ON r.company_id = c.id
+                WHERE c.sector = ?
+                AND r.metric LIKE '%Profit Margin%'
+                AND r.period = (
+                    SELECT MAX(r2.period) FROM ratios r2
+                    WHERE r2.company_id = r.company_id AND r2.metric = r.metric
+                )
+                """,
+                (sector,),
+            )
+            margin_row = margin_cursor.fetchone()
+            if margin_row and margin_row["avg_profit_margin"]:
+                result["avg_profit_margin"] = margin_row["avg_profit_margin"]
+        except Exception:
+            pass
+
+        # Get EPS growth averages from ratios
+        try:
+            eps_cursor = self.db.execute(
+                """
+                SELECT AVG(r.value) as avg_eps_growth
+                FROM ratios r
+                JOIN companies c ON r.company_id = c.id
+                WHERE c.sector = ?
+                AND r.metric LIKE '%EPS Growth%'
+                AND r.period = (
+                    SELECT MAX(r2.period) FROM ratios r2
+                    WHERE r2.company_id = r.company_id AND r2.metric = r.metric
+                )
+                """,
+                (sector,),
+            )
+            eps_row = eps_cursor.fetchone()
+            if eps_row and eps_row["avg_eps_growth"]:
+                result["avg_eps_growth"] = eps_row["avg_eps_growth"]
+        except Exception:
+            pass
+
+        return result
