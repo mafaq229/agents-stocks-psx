@@ -9,5 +9,26 @@ wheels/
 # Virtual environments
 .venv
 
-dev/
-data/
+# Data directories (large files, user-specific)
+data/db/
+data/documents/
+data/cache/
+data/processed/
+
+# Keep migrations
+!data/migrations/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# OS
+.DS_Store
+
+# Logs
+*.log
+
+.claude/
+
+.env
