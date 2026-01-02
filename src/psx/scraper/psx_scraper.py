@@ -197,15 +197,48 @@ class PSXScraper:
             except:
                 pass
 
-            # Sector - look for sector info in profile
+            # Sector - try multiple approaches to find sector info
             sector = None
             try:
-                # Sector is usually in profile section header or stats
-                sector_el = page.locator("text=Sector").locator("xpath=following-sibling::*[1]")
+                # Approach 1: Look for sector in profile section
+                sector_el = page.locator(selectors.PROFILE_SECTOR).first
                 if await sector_el.count() > 0:
                     sector = await sector_el.inner_text()
-            except:
-                pass
+                    sector = sector.strip()
+
+                # Approach 2: Look in stats section for "Sector" label
+                if not sector:
+                    stats_items = await page.locator(selectors.STATS_ITEM).all()
+                    for item in stats_items:
+                        try:
+                            label_text = await item.inner_text()
+                            if "sector" in label_text.lower():
+                                # Get the value part (usually after colon or in sibling)
+                                value_el = item.locator(selectors.STATS_VALUE)
+                                if await value_el.count() > 0:
+                                    sector = await value_el.inner_text()
+                                    sector = sector.strip()
+                                    break
+                        except:
+                            continue
+
+                # Approach 3: Look for sector link/text in header area
+                if not sector:
+                    # PSX shows sector in company header as a link
+                    header_links = await page.locator(".company__header a, .breadcrumb a").all()
+                    for link in header_links:
+                        href = await link.get_attribute("href")
+                        if href and "sector" in href.lower():
+                            sector = await link.inner_text()
+                            sector = sector.strip()
+                            break
+
+                # Filter out false positives like "Stock Screener"
+                if sector and sector.lower() in ["stock screener", "screener", ""]:
+                    sector = None
+
+            except Exception as e:
+                print(f"Error extracting sector: {e}")
 
             return CompanyData(
                 symbol=symbol,

@@ -11,6 +11,11 @@ STATS_VALUE = ".stats_value"
 
 # Company profile
 PROFILE_DESCRIPTION = "#profile p"
+PROFILE_SECTOR = "#profile .company_sector, .company-sector"
+SECTOR_STAT = ".stats_item:has(.stats_label:text-matches('sector', 'i')) .stats_value"
+SECTOR_LABEL = ".stats_item:has-text('Sector') .stats_value"
+SECTOR_BREADCRUMB = ".breadcrumb a:last-child"
+COMPANY_HEADER = ".company__header a"
 
 # Equity section
 EQUITY_STATS = "#equity .stats_value"
