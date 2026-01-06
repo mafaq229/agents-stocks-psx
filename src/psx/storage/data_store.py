@@ -60,6 +60,18 @@ class DataStore:
         Returns:
             company_id
         """
+        # Use data.sector if valid, else fallback to SECTOR_PEERS constant
+        sector = data.sector
+        invalid_sectors = {"stock screener", "screener", ""}
+        if not sector or sector.lower() in invalid_sectors:
+            sector = None  # Reset invalid sector
+            from psx.core.constants import SECTOR_PEERS
+
+            for sector_name, peers_list in SECTOR_PEERS.items():
+                if data.symbol in peers_list:
+                    sector = sector_name
+                    break
+
         cursor = self.db.execute(
             """
             INSERT INTO companies (
@@ -84,7 +96,7 @@ class DataStore:
             (
                 data.symbol,
                 data.name,
-                data.sector,
+                sector,
                 data.description,
                 data.ceo,
                 data.chairperson,

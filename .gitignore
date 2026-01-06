@@ -36,3 +36,5 @@ data/processed/
 output/
 logs/
 dev/
+claude.md
+notebooks/

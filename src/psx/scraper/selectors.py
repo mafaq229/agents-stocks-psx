@@ -17,6 +17,16 @@ SECTOR_LABEL = ".stats_item:has-text('Sector') .stats_value"
 SECTOR_BREADCRUMB = ".breadcrumb a:last-child"
 COMPANY_HEADER = ".company__header a"
 
+# Company name and sector in header
+COMPANY_NAME = ".quote__name"
+COMPANY_SECTOR_HEADER = ".quote__sector span, .quote__sector"
+
+# Profile section structure
+PROFILE_ITEM = ".profile__item"
+PROFILE_ITEM_HEAD = ".item__head"
+PROFILE_ITEM_VALUE = ".profile__item p"
+KEY_PEOPLE_TABLE = ".profile__item--people table"
+
 # Equity section
 EQUITY_STATS = "#equity .stats_value"
 

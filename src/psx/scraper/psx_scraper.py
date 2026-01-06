@@ -186,69 +186,124 @@ class PSXScraper:
 
     async def _scrape_company_info(self, page: Page, symbol: str) -> CompanyData:
         """Scrape company profile information."""
+        name = None
+        sector = None
+        description = None
+        ceo = None
+        chairperson = None
+        company_secretary = None
+        address = None
+        website = None
+        registrar = None
+        auditor = None
+        fiscal_year_end = None
+
         try:
-            # Description
-            description = None
+            # Company name from .quote__name
             try:
-                desc_el = page.locator(selectors.PROFILE_DESCRIPTION).first
+                name_el = page.locator(selectors.COMPANY_NAME).first
+                if await name_el.count() > 0:
+                    name = await name_el.inner_text()
+                    name = name.strip()
+            except:
+                pass
+
+            # Sector from .quote__sector
+            try:
+                sector_el = page.locator(selectors.COMPANY_SECTOR_HEADER).first
+                if await sector_el.count() > 0:
+                    sector = await sector_el.inner_text()
+                    sector = sector.strip()
+
+                # Filter out false positives
+                if sector and sector.lower() in ["stock screener", "screener", ""]:
+                    sector = None
+            except:
+                pass
+
+            # Description from profile section
+            try:
+                desc_el = page.locator(".profile__item--decription p").first
                 if await desc_el.count() > 0:
                     description = await desc_el.inner_text()
                     description = description.strip()
             except:
                 pass
 
-            # Sector - try multiple approaches to find sector info
-            sector = None
+            # KEY PEOPLE from table in .profile__item--people
             try:
-                # Approach 1: Look for sector in profile section
-                sector_el = page.locator(selectors.PROFILE_SECTOR).first
-                if await sector_el.count() > 0:
-                    sector = await sector_el.inner_text()
-                    sector = sector.strip()
+                people_rows = await page.locator(f"{selectors.KEY_PEOPLE_TABLE} tr").all()
+                for row in people_rows:
+                    cells = await row.locator("td").all()
+                    if len(cells) >= 2:
+                        person_name = (await cells[0].inner_text()).strip()
+                        role = (await cells[1].inner_text()).strip().lower()
 
-                # Approach 2: Look in stats section for "Sector" label
-                if not sector:
-                    stats_items = await page.locator(selectors.STATS_ITEM).all()
-                    for item in stats_items:
-                        try:
-                            label_text = await item.inner_text()
-                            if "sector" in label_text.lower():
-                                # Get the value part (usually after colon or in sibling)
-                                value_el = item.locator(selectors.STATS_VALUE)
-                                if await value_el.count() > 0:
-                                    sector = await value_el.inner_text()
-                                    sector = sector.strip()
-                                    break
-                        except:
+                        if role == "ceo" or "chief executive" in role:
+                            ceo = person_name
+                        elif role == "chairperson" or role == "chairman":
+                            chairperson = person_name
+                        elif "company secretary" in role or role == "secretary":
+                            company_secretary = person_name
+            except Exception as e:
+                print(f"Error parsing KEY PEOPLE table: {e}")
+
+            # Profile items with .item__head labels and p values
+            try:
+                profile_items = await page.locator(selectors.PROFILE_ITEM).all()
+
+                for item in profile_items:
+                    heads = await item.locator(selectors.PROFILE_ITEM_HEAD).all()
+                    values = await item.locator("p").all()
+
+                    # Match heads with following p elements
+                    for i, head in enumerate(heads):
+                        head_text = (await head.inner_text()).strip().lower()
+
+                        # Find the next p element after this head
+                        # The value p comes right after the head div
+                        value_p = item.locator(f"{selectors.PROFILE_ITEM_HEAD}:has-text('{(await head.inner_text()).strip()}') + p")
+                        if await value_p.count() == 0:
                             continue
 
-                # Approach 3: Look for sector link/text in header area
-                if not sector:
-                    # PSX shows sector in company header as a link
-                    header_links = await page.locator(".company__header a, .breadcrumb a").all()
-                    for link in header_links:
-                        href = await link.get_attribute("href")
-                        if href and "sector" in href.lower():
-                            sector = await link.inner_text()
-                            sector = sector.strip()
-                            break
+                        value_text = (await value_p.inner_text()).strip()
 
-                # Filter out false positives like "Stock Screener"
-                if sector and sector.lower() in ["stock screener", "screener", ""]:
-                    sector = None
+                        if head_text == "address":
+                            address = value_text
+                        elif head_text == "website":
+                            # Try to get href from link
+                            link = value_p.locator("a")
+                            if await link.count() > 0:
+                                website = await link.get_attribute("href")
+                            else:
+                                website = value_text
+                        elif head_text == "registrar":
+                            registrar = value_text
+                        elif head_text == "auditor":
+                            auditor = value_text
+                        elif "fiscal" in head_text or "year end" in head_text:
+                            fiscal_year_end = value_text
 
             except Exception as e:
-                print(f"Error extracting sector: {e}")
-
-            return CompanyData(
-                symbol=symbol,
-                description=description,
-                sector=sector,
-            )
+                print(f"Error parsing profile items: {e}")
 
         except Exception as e:
             print(f"Error scraping company info: {e}")
-            return CompanyData(symbol=symbol)
+
+        return CompanyData(
+            symbol=symbol,
+            name=name,
+            sector=sector,
+            description=description,
+            ceo=ceo,
+            chairperson=chairperson,
+            company_secretary=company_secretary,
+            address=address,
+            website=website,
+            registrar=registrar,
+            auditor=auditor,
+            fiscal_year_end=fiscal_year_end,
+        )
 
     async def _scrape_equity(self, page: Page) -> EquityData:
         """Scrape equity/shareholding data."""
