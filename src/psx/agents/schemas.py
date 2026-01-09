@@ -318,7 +318,7 @@ class AnalysisState:
     analysis: dict[str, AnalystOutput] = field(default_factory=dict)
     iteration: int = 0
     max_iterations: int = 10
-    started_at: str = field(default_factory=lambda: datetime.utcnow().isoformat())
+    started_at: str = field(default_factory=lambda: datetime.now().isoformat())
     errors: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
