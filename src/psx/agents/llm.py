@@ -140,10 +140,9 @@ class LLMClient:
         """OpenAI chat completion."""
         client = self._get_openai_client()
 
-        # Build messages with system prompt
+        # Starting with system prompt
         all_messages = []
         if system:
-            # TODO: investigate whether this is the correct way to do it since role is system throughtout
             all_messages.append({"role": "system", "content": system})
         all_messages.extend(messages)
 
@@ -152,7 +151,7 @@ class LLMClient:
             "model": self.model,
             "messages": all_messages,
             "temperature": self.temperature,
-            "max_completion_tokens": self.max_tokens, # TODO: investigate on range more ()
+            "max_completion_tokens": self.max_tokens,
         }
         # TODO: investigate other args
         if tools:
