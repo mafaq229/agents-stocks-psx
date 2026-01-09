@@ -122,6 +122,7 @@ class TavilySearch:
 
         elapsed = (datetime.now() - start_time).total_seconds()
 
+        # TODO: investigate this score parameter further
         results = []
         for item in response.get("results", []):
             results.append(
@@ -160,24 +161,11 @@ class TavilySearch:
         # Add news-specific terms to query
         news_query = f"{query} news latest"
 
-        # Use news-focused domains
-        news_domains = [
-            "reuters.com",
-            "bloomberg.com",
-            "brecorder.com",
-            "dawn.com",
-            "tribune.com.pk",
-            "geo.tv",
-            "arynews.tv",
-            "thenews.com.pk",
-        ]
-
         return self.search(
             query=news_query,
             max_results=max_results,
             search_depth="advanced",
-            include_answer=True,
-            include_domains=news_domains,
+            include_answer=True
         )
 
     def search_company_info(
@@ -198,7 +186,7 @@ class TavilySearch:
         """
         query = company_name
         if symbol:
-            query = f"{company_name} {symbol} Pakistan stock"
+            query = f"{company_name} {symbol} Pakistan stock exchange. Search for information about the company business, operations, financial performance and future plans."
         else:
             query = f"{company_name} Pakistan company"
 
@@ -225,10 +213,7 @@ class TavilySearch:
         Returns:
             SearchResponse with competitor info
         """
-        if sector:
-            query = f"{company_name} competitors {sector} Pakistan"
-        else:
-            query = f"{company_name} competitors Pakistan stock market"
+        query = f"what are PSX stock symbols of competitors of {company_name} in {sector} sector. Write only the stock symbols separated by commas."
 
         return self.search(
             query=query,

@@ -60,18 +60,6 @@ class DataStore:
         Returns:
             company_id
         """
-        # Use data.sector if valid, else fallback to SECTOR_PEERS constant
-        sector = data.sector
-        invalid_sectors = {"stock screener", "screener", ""}
-        if not sector or sector.lower() in invalid_sectors:
-            sector = None  # Reset invalid sector
-            from psx.core.constants import SECTOR_PEERS
-
-            for sector_name, peers_list in SECTOR_PEERS.items():
-                if data.symbol in peers_list:
-                    sector = sector_name
-                    break
-
         cursor = self.db.execute(
             """
             INSERT INTO companies (
@@ -96,7 +84,7 @@ class DataStore:
             (
                 data.symbol,
                 data.name,
-                sector,
+                data.sector,
                 data.description,
                 data.ceo,
                 data.chairperson,
@@ -570,7 +558,7 @@ class DataStore:
         self.db.commit()
 
     # ========== AGGREGATE QUERIES ==========
-
+    # TODO: look into the calculation (see which info is useful for comparison analysis). also accuracy of output
     def get_sector_averages(self, sector: str) -> Dict[str, Any]:
         """Get comprehensive average metrics for a sector.
 
@@ -655,3 +643,61 @@ class DataStore:
             pass
 
         return result
+
+    # ========== CONSOLIDATED SAVE OPERATIONS ==========
+
+    def save_scraped_data(self, data: ScrapedData) -> Optional[int]:
+        """Save all scraped data for a company in one operation.
+
+        Consolidates saving company, quote, financials, ratios,
+        announcements, reports, and cache.
+
+        Args:
+            data: ScrapedData object containing all scraped info
+
+        Returns:
+            company_id if successful, None if no company data
+        """
+        if not data.company:
+            return None
+
+        # Save company and get ID
+        company_id = self.save_company(data.company)
+
+        # Save quote with equity data
+        if data.quote:
+            self.save_quote(company_id, data.quote, data.equity)
+
+        # Save financials (handle dict format: {period_type: [rows]})
+        if data.financials:
+            if isinstance(data.financials, dict):
+                for period_type, rows in data.financials.items():
+                    self.save_financials(company_id, rows)
+            else:
+                # Handle list format
+                self.save_financials(company_id, data.financials)
+
+        # Save ratios
+        if data.ratios:
+            self.save_ratios(company_id, data.ratios)
+
+        # Save announcements (handle dict format: {category: [anns]})
+        if data.announcements:
+            if isinstance(data.announcements, dict):
+                for category, anns in data.announcements.items():
+                    for ann in anns:
+                        self.save_announcement(company_id, ann)
+            else:
+                # Handle list format
+                for ann in data.announcements:
+                    self.save_announcement(company_id, ann)
+
+        # Save reports
+        if data.reports:
+            for report in data.reports:
+                self.save_report(company_id, report)
+
+        # Save to JSON cache
+        self.save_cache(data.company.symbol, data)
+
+        return company_id
