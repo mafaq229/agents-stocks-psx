@@ -249,21 +249,24 @@ def get_sector_peers(
     max_peers: int = 5,
     auto_discover: bool = True,
     fetch_data: bool = True,
+    include_sector_averages: bool = True,
 ) -> dict[str, Any]:
-    """Get peer symbols and their financial data for companies in the same sector.
+    """Get peer symbols, their financial data, and sector averages in one call.
 
     First checks database for peers. If none found and auto_discover=True,
     searches the web for competitor symbols. If fetch_data=True, automatically
-    fetches financial data for all peers (eliminates need for separate get_peer_data calls).
+    fetches financial data for all peers. If include_sector_averages=True,
+    also returns sector benchmark metrics.
 
     Args:
         symbol: Stock ticker symbol
         max_peers: Maximum number of peers to return (default 5)
         auto_discover: If True, discover peers via web search when DB is empty
         fetch_data: If True, auto-fetch financial data for each peer (default True)
+        include_sector_averages: If True, include sector average metrics (default True)
 
     Returns:
-        Dict with sector, peer symbols, and peer financial data
+        Dict with sector, peer symbols, peer financial data, and sector averages
     """
     symbol = symbol.upper()
     store = _get_data_store()
@@ -326,6 +329,11 @@ def get_sector_peers(
 
         result["peer_data"] = peer_data_list
         result["peers_fetched"] = len(peer_data_list)
+
+    # Include sector averages for benchmarking
+    if include_sector_averages and sector:
+        logger.debug(f"Fetching sector averages for {sector}")
+        result["sector_averages"] = store.get_sector_averages(sector)
 
     return result
 
@@ -402,19 +410,6 @@ def get_peer_data(symbol: str) -> dict[str, Any]:
     return result
 
 
-def get_sector_averages(sector: str) -> dict[str, Any]:
-    """Get average metrics for a sector.
-
-    Args:
-        sector: Sector name
-
-    Returns:
-        Dict with sector average metrics
-    """
-    store = _get_data_store()
-    return store.get_sector_averages(sector)
-
-
 def list_companies() -> dict[str, Any]:
     """List all companies in the database.
 
@@ -445,7 +440,7 @@ DATA_AGENT_TOOLS = [
     ),
     Tool(
         name="get_sector_peers",
-        description="Get peer symbols AND their financial data in one call. Checks DB first, discovers via web search if empty, then auto-fetches peer financials. Returns both peer symbols and peer_data.",
+        description="Get peer symbols, their financial data, AND sector averages in one call. Checks DB first, discovers via web search if empty, auto-fetches peer financials, and includes sector benchmarks. Returns peers, peer_data, and sector_averages.",
         parameters={
             "type": "object",
             "properties": {
@@ -464,36 +459,6 @@ DATA_AGENT_TOOLS = [
         function=get_sector_peers,
     ),
     Tool(
-        name="get_peer_data",
-        description="Get financial summary for a peer company (price, P/E, market cap, EPS). Auto-scrapes if peer not in database.",
-        parameters={
-            "type": "object",
-            "properties": {
-                "symbol": {
-                    "type": "string",
-                    "description": "Stock ticker symbol of the peer company",
-                },
-            },
-            "required": ["symbol"],
-        },
-        function=get_peer_data,
-    ),
-    Tool(
-        name="get_sector_averages",
-        description="Get average P/E ratio and other metrics for a sector. Use for benchmarking.",
-        parameters={
-            "type": "object",
-            "properties": {
-                "sector": {
-                    "type": "string",
-                    "description": "Sector name (e.g., 'Oil & Gas Exploration Companies')",
-                },
-            },
-            "required": ["sector"],
-        },
-        function=get_sector_averages,
-    ),
-    Tool(
         name="list_companies",
         description="List all companies available in the database.",
         parameters={
@@ -509,20 +474,21 @@ DATA_AGENT_SYSTEM_PROMPT = """You are a Data Agent specialized in retrieving sto
 
 Your responsibilities:
 1. Fetch company data using get_company_data (auto-scrapes if not in DB)
-2. Get peers AND their data using get_sector_peers (discovers + fetches in one call)
-3. Get sector averages for benchmarking
-4. Report any data gaps or issues
+2. Get peers, their data, AND sector averages using get_sector_peers (all in one call)
+3. Report any data gaps or issues
 
-WORKFLOW (only 3 tool calls needed):
+WORKFLOW (only 2 tool calls needed):
 1. Call get_company_data(symbol) - returns full company data, auto-scrapes if needed
-2. Call get_sector_peers(symbol) - returns peers AND peer_data in one call (discovers from web + auto-fetches their financials)
-3. Call get_sector_averages(sector) for benchmarking
+2. Call get_sector_peers(symbol) - returns peers, peer_data, AND sector_averages in one call
 
-IMPORTANT: get_sector_peers now auto-fetches peer financial data. Do NOT call get_peer_data separately - it's already included in get_sector_peers response.
+IMPORTANT: get_sector_peers now includes EVERYTHING:
+- Peer discovery (from DB or web search)
+- Peer financial data (auto-fetched)
+- Sector averages (for benchmarking)
 
 Guidelines:
 - get_company_data auto-scrapes if company not in database
-- get_sector_peers discovers peers AND fetches their data automatically
+- get_sector_peers returns peers + peer_data + sector_averages in one response
 - Report any missing data fields as "data_gaps"
 
 When you have gathered all necessary data, respond with a JSON object containing:
@@ -542,7 +508,7 @@ When you have gathered all necessary data, respond with a JSON object containing
     "data_freshness": "from_database" or "freshly_scraped"
 }
 
-Be efficient - only 3 tool calls are needed for complete data gathering."""
+Be efficient - only 2 tool calls are needed for complete data gathering."""
 
 
 class DataAgent(BaseAgent):
@@ -554,6 +520,7 @@ class DataAgent(BaseAgent):
             description="Retrieves stock data from PSX website and database",
             system_prompt=DATA_AGENT_SYSTEM_PROMPT,
             max_iterations=5,
+            max_tokens=6144,  # Moderate output for JSON with company data
         )
         super().__init__(config=config, tools=DATA_AGENT_TOOLS, **kwargs)
 
