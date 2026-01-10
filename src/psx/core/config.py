@@ -13,15 +13,44 @@ load_dotenv()
 LLMProvider = Literal["openai", "anthropic"]
 
 
+# Default models per provider
+DEFAULT_MODELS = {
+    "openai": {
+        "smart": "gpt-5.1",       # For complex analysis (AnalystAgent, Synthesis)
+        "fast": "gpt-5-nano",   # For routing/summarization (Data, Supervisor, PDF summarizer)
+    },
+    "anthropic": {
+        "smart": "claude-sonnet-4-5-20250929",
+        "fast": "claude-haiku-4-5-20251001",
+    },
+}
+
+
 @dataclass
 class LLMConfig:
     """LLM provider configuration."""
 
     provider: LLMProvider = "openai"
-    model: str = "gpt-5.1"
+    model: str = "gpt-5.1"  # Default smart model
+    fast_model: str = "gpt-5-nano"  # Cheap model for summarization/routing
     temperature: float = 0.0
-    max_tokens: int = 4096
+    max_tokens: int = 10000
     timeout: float = 120.0
+
+
+@dataclass
+class AgentModels:
+    """Per-agent model configuration."""
+
+    # Agents that need smarter models (complex reasoning)
+    analyst: Optional[str] = None      # Financial analysis - use smart
+    synthesis: Optional[str] = None    # Final report generation - use smart
+
+    # Agents that can use cheaper models (tool calling, routing)
+    supervisor: Optional[str] = None   # Routing decisions - use fast
+    data: Optional[str] = None         # Tool calls only - use fast
+    research: Optional[str] = None     # Tool calls + some reasoning - use fast
+    pdf_summarizer: Optional[str] = None  # PDF extraction - use fast
 
 
 @dataclass
@@ -35,6 +64,9 @@ class Config:
 
     # LLM Settings
     llm: LLMConfig = field(default_factory=LLMConfig)
+
+    # Per-agent model overrides
+    agent_models: AgentModels = field(default_factory=AgentModels)
 
     # Data paths
     data_dir: str = "data"
@@ -54,24 +86,40 @@ class Config:
 
         if anthropic_key and not openai_key:
             default_provider: LLMProvider = "anthropic"
-            default_model = "claude-sonnet-4-5-20250929"
         else:
             default_provider = "openai"
-            default_model = "gpt-5.1"
 
         # Override from env if specified
         provider = os.getenv("PSX_LLM_PROVIDER", default_provider)
         if provider not in ("openai", "anthropic"):
             provider = default_provider
 
-        model = os.getenv("PSX_LLM_MODEL", default_model)
+        # Get default models for this provider
+        provider_models = DEFAULT_MODELS.get(provider, DEFAULT_MODELS["openai"])
+        default_smart = provider_models["smart"]
+        default_fast = provider_models["fast"]
+
+        # Allow env override for main model
+        model = os.getenv("PSX_LLM_MODEL", default_smart)
+        fast_model = os.getenv("PSX_LLM_FAST_MODEL", default_fast)
 
         llm_config = LLMConfig(
             provider=provider,  # type: ignore
             model=model,
+            fast_model=fast_model,
             temperature=float(os.getenv("PSX_LLM_TEMPERATURE", "0.0")),
             max_tokens=int(os.getenv("PSX_LLM_MAX_TOKENS", "4096")),
             timeout=float(os.getenv("PSX_LLM_TIMEOUT", "120.0")),
+        )
+
+        # Per-agent model overrides (optional)
+        agent_models = AgentModels(
+            analyst=os.getenv("PSX_MODEL_ANALYST"),
+            synthesis=os.getenv("PSX_MODEL_SYNTHESIS"),
+            supervisor=os.getenv("PSX_MODEL_SUPERVISOR"),
+            data=os.getenv("PSX_MODEL_DATA"),
+            research=os.getenv("PSX_MODEL_RESEARCH"),
+            pdf_summarizer=os.getenv("PSX_MODEL_PDF_SUMMARIZER"),
         )
 
         return cls(
@@ -79,6 +127,7 @@ class Config:
             anthropic_api_key=anthropic_key,
             tavily_api_key=os.getenv("TAVILY_API_KEY"),
             llm=llm_config,
+            agent_models=agent_models,
             data_dir=os.getenv("PSX_DATA_DIR", "data"),
             db_path=os.getenv("PSX_DB_PATH", "data/db/psx.db"),
             cache_dir=os.getenv("PSX_CACHE_DIR", "data/cache"),
@@ -100,6 +149,29 @@ class Config:
             return self.anthropic_api_key
         else:
             raise ValueError(f"Unknown provider: {provider}")
+
+    def get_model_for_agent(self, agent_type: str) -> str:
+        """Get the model to use for a specific agent type.
+
+        Args:
+            agent_type: One of 'analyst', 'synthesis', 'supervisor', 'data',
+                       'research', 'pdf_summarizer'
+
+        Returns:
+            Model name to use
+        """
+        # Check for explicit override first
+        override = getattr(self.agent_models, agent_type, None)
+        if override:
+            return override
+
+        # Use smart model for complex reasoning tasks
+        smart_agents = {"analyst", "synthesis"}
+        if agent_type in smart_agents:
+            return self.llm.model  # Smart model
+
+        # Use fast model for routing/tool-calling tasks
+        return self.llm.fast_model
 
     def validate(self) -> list[str]:
         """Validate configuration and return list of issues."""
