@@ -483,12 +483,23 @@ class PDFParser:
         return result
 
     def _url_to_cache_key(self, url: str) -> str:
-        """Convert URL to safe cache filename."""
-        # Extract meaningful parts from URL
-        filename = url.split("/")[-1]
-        # Remove query params and existing extension
-        filename = filename.split("?")[0]
-        if filename.endswith(".pdf"):
-            filename = filename[:-4]
-        safe_chars = re.sub(r"[^\w\-.]", "_", filename)
-        return safe_chars[:100] + ".pdf"
+        """Convert URL to safe cache filename.
+
+        Extracts document ID from PSX URLs (e.g., ?id=264877) for human-readable
+        cache names. Falls back to URL hash for other URL patterns.
+        """
+        import hashlib
+
+        # Try to extract PSX document ID from URL query params
+        id_match = re.search(r'[?&]id=(\d+)', url)
+        if id_match:
+            return f"{id_match.group(1)}.pdf"
+
+        # Try to extract ID from path (e.g., /download/document/264877)
+        path_match = re.search(r'/(\d{5,})(?:\.\w+)?$', url)
+        if path_match:
+            return f"{path_match.group(1)}.pdf"
+
+        # Fallback: hash the full URL for collision-resistant cache key
+        url_hash = hashlib.md5(url.encode()).hexdigest()[:16]
+        return f"{url_hash}.pdf"

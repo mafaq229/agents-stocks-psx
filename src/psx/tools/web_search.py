@@ -146,7 +146,6 @@ class TavilySearch:
         self,
         query: str,
         max_results: int = 5,
-        days: int = 7,
     ) -> SearchResponse:
         """Search for recent news.
 
