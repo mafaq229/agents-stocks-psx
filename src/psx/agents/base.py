@@ -24,6 +24,7 @@ class AgentConfig:
     system_prompt: str
     max_iterations: int = 5
     temperature: float = 0.0
+    max_tokens: int = 4096  # Output tokens limit
 
 
 class BaseAgent:
@@ -57,6 +58,7 @@ class BaseAgent:
             provider=llm_provider or app_config.llm.provider,
             model=llm_model or app_config.llm.model,
             temperature=config.temperature,
+            max_tokens=config.max_tokens,
         )
 
         self.max_iterations = config.max_iterations
@@ -109,6 +111,26 @@ class BaseAgent:
                 tools=self.tool_list if self.tool_list else None,
                 system=self.config.system_prompt,
             )
+
+            # Log response metadata
+            logger.debug(
+                f"[{self.config.name}] Response: finish_reason={response.finish_reason}, "
+                f"tokens={response.usage.get('completion_tokens', 'N/A')}"
+            )
+
+            # Check for truncation (max_tokens reached)
+            if response.finish_reason == "length":
+                logger.warning(
+                    f"[{self.config.name}] ⚠️ Response TRUNCATED (hit max_tokens). "
+                    f"Output may be incomplete or malformed."
+                )
+                # If content looks incomplete (e.g., truncated JSON), return error
+                if not response.content or response.content.strip().endswith((',', ':', '"', '{')):
+                    return {
+                        "error": "Response truncated due to max_tokens limit",
+                        "partial_output": response.content,
+                        "truncated": True,
+                    }
 
             # Log LLM reasoning if present
             if response.content:
