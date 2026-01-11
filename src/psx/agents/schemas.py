@@ -251,7 +251,6 @@ class NewsItem:
     source: Optional[str] = None
     date: Optional[str] = None
     summary: Optional[str] = None
-    sentiment: Optional[float] = None  # -1 to 1
 
     def to_dict(self) -> dict[str, Any]:
         return {k: v for k, v in asdict(self).items() if v is not None}
@@ -263,10 +262,9 @@ class ResearchOutput:
 
     symbol: str
     news_items: list[NewsItem] = field(default_factory=list)
-    sentiment_score: float = 0.0  # -1 to 1
-    sentiment_label: str = "neutral"  # positive, negative, neutral
     key_events: list[str] = field(default_factory=list)
     report_highlights: list[str] = field(default_factory=list)
+    management_commentary: str = ""  # Key insights from director's report
     risks_identified: list[str] = field(default_factory=list)
     opportunities: list[str] = field(default_factory=list)
     competitor_insights: dict[str, Any] = field(default_factory=dict)
@@ -275,10 +273,9 @@ class ResearchOutput:
         return {
             "symbol": self.symbol,
             "news_items": [n.to_dict() for n in self.news_items],
-            "sentiment_score": self.sentiment_score,
-            "sentiment_label": self.sentiment_label,
             "key_events": self.key_events,
             "report_highlights": self.report_highlights,
+            "management_commentary": self.management_commentary,
             "risks_identified": self.risks_identified,
             "opportunities": self.opportunities,
             "competitor_insights": self.competitor_insights,
@@ -287,8 +284,6 @@ class ResearchOutput:
     def to_context_string(self) -> str:
         """Convert to a string suitable for LLM context."""
         lines = [f"=== Research for {self.symbol} ==="]
-
-        lines.append(f"\nSentiment: {self.sentiment_label} ({self.sentiment_score:+.2f})")
 
         if self.news_items:
             lines.append(f"\nRecent News ({len(self.news_items)} items):")
@@ -299,10 +294,18 @@ class ResearchOutput:
             lines.append(f"\nKey Events: {', '.join(self.key_events[:3])}")
 
         if self.report_highlights:
-            lines.append(f"\nReport Highlights: {', '.join(self.report_highlights[:3])}")
+            lines.append(f"\nReport Highlights:")
+            for h in self.report_highlights[:5]:
+                lines.append(f"  - {h}")
+
+        if self.management_commentary:
+            lines.append(f"\nManagement Commentary: {self.management_commentary[:300]}...")
 
         if self.risks_identified:
             lines.append(f"\nRisks: {', '.join(self.risks_identified[:3])}")
+
+        if self.opportunities:
+            lines.append(f"\nOpportunities: {', '.join(self.opportunities[:3])}")
 
         return "\n".join(lines)
 
@@ -360,75 +363,206 @@ class AnalysisReport:
 
     query: str
     symbols: list[str]
-    summary: str
     recommendation: Recommendation
     confidence: float
+
+    # Raw data from agents
     data: dict[str, DataAgentOutput] = field(default_factory=dict)
     research: dict[str, ResearchOutput] = field(default_factory=dict)
     analysis: dict[str, AnalystOutput] = field(default_factory=dict)
-    key_findings: list[str] = field(default_factory=list)
-    risks: list[str] = field(default_factory=list)
+
+    # Section 1: Business Overview
+    business_overview: str = ""  # What the company does, products, moat
+    industry_context: str = ""  # Sector trends, regulations
+
+    # Section 2: Ownership & Management
+    ownership_structure: dict[str, Any] = field(default_factory=dict)  # Promoter/institutional/public
+    management_notes: list[str] = field(default_factory=list)  # CEO, board decisions
+
+    # Section 3: Financial Snapshot (latest year)
+    financial_snapshot: dict[str, Any] = field(default_factory=dict)  # Revenue, profit, margins, ratios
+
+    # Section 4: Valuation
+    valuation_table: list[dict] = field(default_factory=list)  # [{method, value, inputs}]
+    fair_value: Optional[float] = None
+    margin_of_safety: Optional[float] = None
+
+    # Section 5: Peer Comparison
+    peer_comparison_table: list[dict] = field(default_factory=list)
+    relative_position: str = ""  # How company compares to peers
+
+    # Section 6: Investment Thesis
+    strengths: list[dict] = field(default_factory=list)  # [{point, reasoning}]
+    risks: list[dict] = field(default_factory=list)  # [{point, reasoning}]
+    recent_developments: list[str] = field(default_factory=list)
+
+    # Section 7: Recommendation
+    reasoning: str = ""  # Detailed 3-4 sentence explanation
+    entry_price: Optional[float] = None
+    target_price: Optional[float] = None
+    stop_loss: Optional[float] = None
+
     generated_at: str = field(default_factory=lambda: datetime.utcnow().isoformat())
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "query": self.query,
             "symbols": self.symbols,
-            "summary": self.summary,
             "recommendation": self.recommendation,
             "confidence": self.confidence,
             "data": {k: v.to_dict() for k, v in self.data.items()},
             "research": {k: v.to_dict() for k, v in self.research.items()},
             "analysis": {k: v.to_dict() for k, v in self.analysis.items()},
-            "key_findings": self.key_findings,
+            "business_overview": self.business_overview,
+            "industry_context": self.industry_context,
+            "ownership_structure": self.ownership_structure,
+            "management_notes": self.management_notes,
+            "financial_snapshot": self.financial_snapshot,
+            "valuation_table": self.valuation_table,
+            "fair_value": self.fair_value,
+            "margin_of_safety": self.margin_of_safety,
+            "peer_comparison_table": self.peer_comparison_table,
+            "relative_position": self.relative_position,
+            "strengths": self.strengths,
             "risks": self.risks,
+            "recent_developments": self.recent_developments,
+            "reasoning": self.reasoning,
+            "entry_price": self.entry_price,
+            "target_price": self.target_price,
+            "stop_loss": self.stop_loss,
             "generated_at": self.generated_at,
         }
 
     def to_markdown(self) -> str:
-        """Convert to markdown report."""
-        lines = [f"# Stock Analysis Report"]
-        lines.append(f"\n**Query:** {self.query}")
+        """Convert to comprehensive 7-section markdown report."""
+        symbol = self.symbols[0] if self.symbols else "UNKNOWN"
+        lines = [f"# Investment Analysis: {symbol}"]
         lines.append(f"**Generated:** {self.generated_at}")
+        lines.append("")
 
-        lines.append(f"\n## Summary")
-        lines.append(self.summary)
+        # Section 1: Business Overview
+        lines.append("---")
+        lines.append("\n## 1. Business Overview")
+        if self.business_overview:
+            lines.append(f"\n### What the Company Does")
+            lines.append(self.business_overview)
+        if self.industry_context:
+            lines.append(f"\n### Industry & Sector")
+            lines.append(self.industry_context)
 
-        lines.append(f"\n## Recommendation")
-        lines.append(f"**{self.recommendation}** (Confidence: {self.confidence:.0%})")
+        # Section 2: Ownership & Management
+        lines.append("\n---")
+        lines.append("\n## 2. Ownership & Management")
+        if self.ownership_structure:
+            lines.append("\n### Ownership Structure")
+            for key, val in self.ownership_structure.items():
+                lines.append(f"- {key.replace('_', ' ').title()}: {val}")
+        if self.management_notes:
+            lines.append("\n### Key Management")
+            for note in self.management_notes:
+                lines.append(f"- {note}")
 
-        if self.key_findings:
-            lines.append(f"\n## Key Findings")
-            for finding in self.key_findings:
-                lines.append(f"- {finding}")
+        # Section 3: Financial Snapshot
+        lines.append("\n---")
+        lines.append("\n## 3. Financial Snapshot")
+        if self.financial_snapshot:
+            lines.append("\n| Metric | Value |")
+            lines.append("|--------|-------|")
+            for key, val in self.financial_snapshot.items():
+                metric_name = key.replace("_", " ").title()
+                lines.append(f"| {metric_name} | {val} |")
+
+        # Section 4: Valuation
+        lines.append("\n---")
+        lines.append("\n## 4. Valuation")
+        if self.valuation_table:
+            lines.append("\n| Method | Fair Value | Key Inputs |")
+            lines.append("|--------|------------|------------|")
+            for v in self.valuation_table:
+                method = v.get("method", "N/A")
+                value = v.get("value", "N/A")
+                inputs = v.get("inputs", "")
+                lines.append(f"| {method} | Rs. {value} | {inputs} |")
+
+        if self.fair_value:
+            lines.append(f"\n**Fair Value Estimate:** Rs. {self.fair_value:,.2f}")
+        # Get current price from analysis if available
+        current_price = None
+        if symbol in self.analysis:
+            current_price = self.analysis[symbol].current_price
+        if current_price:
+            lines.append(f"**Current Price:** Rs. {current_price:,.2f}")
+        if self.margin_of_safety is not None:
+            status = "undervalued" if self.margin_of_safety > 0 else "overvalued" if self.margin_of_safety < 0 else "fairly valued"
+            lines.append(f"**Margin of Safety:** {self.margin_of_safety:.1f}% ({status})")
+
+        # Section 5: Peer Comparison
+        lines.append("\n---")
+        lines.append("\n## 5. Peer Comparison")
+        if self.peer_comparison_table:
+            # Get all keys from first entry
+            if self.peer_comparison_table:
+                headers = ["Symbol"] + list(self.peer_comparison_table[0].keys())
+                headers = [h for h in headers if h != "symbol"]
+                lines.append(f"\n| Symbol | {' | '.join(h.replace('_', ' ').title() for h in headers if h != 'symbol')} |")
+                lines.append(f"|--------|{'|'.join(['--------'] * (len(headers)))}|")
+                for peer in self.peer_comparison_table:
+                    sym = peer.get("symbol", "N/A")
+                    vals = [str(peer.get(h, "N/A")) for h in headers if h != "symbol"]
+                    lines.append(f"| {sym} | {' | '.join(vals)} |")
+        if self.relative_position:
+            lines.append(f"\n**Relative Position:** {self.relative_position}")
+
+        # Section 6: Investment Thesis
+        lines.append("\n---")
+        lines.append("\n## 6. Investment Thesis")
+
+        if self.strengths:
+            lines.append("\n### Why Consider Investing (Strengths)")
+            for i, s in enumerate(self.strengths, 1):
+                if isinstance(s, dict):
+                    point = s.get("point", "")
+                    reasoning = s.get("reasoning", "")
+                    lines.append(f"{i}. **{point}** - {reasoning}")
+                else:
+                    lines.append(f"{i}. {s}")
 
         if self.risks:
-            lines.append(f"\n## Risks")
-            for risk in self.risks:
-                lines.append(f"- {risk}")
+            lines.append("\n### Key Risks to Monitor")
+            for i, r in enumerate(self.risks, 1):
+                if isinstance(r, dict):
+                    point = r.get("point", "")
+                    reasoning = r.get("reasoning", "")
+                    lines.append(f"{i}. **{point}** - {reasoning}")
+                else:
+                    lines.append(f"{i}. {r}")
 
-        for symbol in self.symbols:
-            lines.append(f"\n## {symbol}")
+        if self.recent_developments:
+            lines.append("\n### Recent Developments")
+            for dev in self.recent_developments:
+                lines.append(f"- {dev}")
 
-            if symbol in self.analysis:
-                a = self.analysis[symbol]
-                lines.append(f"\n### Valuation")
-                if a.fair_value:
-                    lines.append(f"- Fair Value: Rs. {a.fair_value}")
-                if a.current_price:
-                    lines.append(f"- Current Price: Rs. {a.current_price}")
-                if a.margin_of_safety:
-                    lines.append(f"- Margin of Safety: {a.margin_of_safety:.1f}%")
+        # Section 7: Recommendation
+        lines.append("\n---")
+        lines.append("\n## 7. Recommendation")
+        lines.append(f"\n### Verdict: **{self.recommendation}**")
+        lines.append(f"### Confidence: {self.confidence:.0%}")
 
-                if a.strengths:
-                    lines.append(f"\n### Strengths")
-                    for s in a.strengths:
-                        lines.append(f"- {s}")
+        if self.reasoning:
+            lines.append(f"\n### Reasoning")
+            lines.append(self.reasoning)
 
-                if a.red_flags:
-                    lines.append(f"\n### Red Flags")
-                    for r in a.red_flags:
-                        lines.append(f"- {r}")
+        lines.append("\n### Suggested Action")
+        if self.entry_price:
+            lines.append(f"- **Entry Price:** Rs. {self.entry_price:,.2f}")
+        if self.target_price:
+            upside = ""
+            if current_price and current_price > 0:
+                upside_pct = ((self.target_price - current_price) / current_price) * 100
+                upside = f" ({upside_pct:.1f}% upside)"
+            lines.append(f"- **Target Price (12-mo):** Rs. {self.target_price:,.2f}{upside}")
+        if self.stop_loss:
+            lines.append(f"- **Stop-Loss:** Rs. {self.stop_loss:,.2f}")
 
         return "\n".join(lines)
 

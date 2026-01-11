@@ -186,7 +186,7 @@ def get_report_text_for_llm(url: str, max_chars: int = 50000) -> dict[str, Any]:
             provider=config.llm.provider,
             model=summarizer_model,
             temperature=0.0,
-            max_tokens=2500,  # Summary should be concise
+            max_tokens=10000,
         )
 
         logger.info(f"[PDFSummarizer] Summarizing PDF with {summarizer_model} ({len(text)} chars)")
@@ -219,69 +219,6 @@ def get_report_text_for_llm(url: str, max_chars: int = 50000) -> dict[str, Any]:
     except Exception as e:
         logger.error(f"PDF summarization failed: {e}")
         return {"error": str(e), "url": url}
-
-# TODO: decide on whether to keep this simple rule-based sentiment or use LLM or remove entirely
-def analyze_sentiment(texts: list[str]) -> dict[str, Any]:
-    """Analyze sentiment of provided texts.
-
-    Simple rule-based sentiment analysis.
-
-    Args:
-        texts: List of text strings to analyze
-
-    Returns:
-        Dict with sentiment scores
-    """
-    if not texts:
-        return {"error": "No texts provided", "sentiment_score": 0}
-
-    # Simple keyword-based sentiment
-    positive_words = {
-        "growth", "profit", "increase", "strong", "positive", "gain",
-        "improved", "beat", "exceed", "record", "dividend", "expansion",
-        "success", "opportunity", "confident", "optimistic", "upgrade",
-    }
-    negative_words = {
-        "loss", "decline", "decrease", "weak", "negative", "drop",
-        "fall", "miss", "concern", "risk", "debt", "downturn",
-        "challenge", "warning", "downgrade", "uncertain", "volatile",
-    }
-
-    total_score = 0
-    scores = []
-
-    for text in texts:
-        text_lower = text.lower()
-        words = text_lower.split()
-
-        pos_count = sum(1 for w in words if w in positive_words)
-        neg_count = sum(1 for w in words if w in negative_words)
-
-        if pos_count + neg_count > 0:
-            score = (pos_count - neg_count) / (pos_count + neg_count)
-        else:
-            score = 0
-
-        scores.append(score)
-        total_score += score
-
-    avg_score = total_score / len(texts) if texts else 0
-
-    # Determine label
-    if avg_score > 0.2:
-        label = "positive"
-    elif avg_score < -0.2:
-        label = "negative"
-    else:
-        label = "neutral"
-
-    return {
-        "sentiment_score": round(avg_score, 3),
-        "sentiment_label": label,
-        "text_count": len(texts),
-        "individual_scores": scores,
-    }
-
 
 # Tool definitions
 RESEARCH_AGENT_TOOLS = [
@@ -344,51 +281,37 @@ RESEARCH_AGENT_TOOLS = [
         },
         function=get_report_text_for_llm,
     ),
-    Tool(
-        name="analyze_sentiment",
-        description="Analyze sentiment of text strings. Returns sentiment score (-1 to 1) and label.",
-        parameters={
-            "type": "object",
-            "properties": {
-                "texts": {
-                    "type": "array",
-                    "items": {"type": "string"},
-                    "description": "List of texts to analyze",
-                },
-            },
-            "required": ["texts"],
-        },
-        function=analyze_sentiment,
-    ),
 ]
 
 
 RESEARCH_AGENT_SYSTEM_PROMPT = """You are a Research Agent specialized in gathering qualitative information about Pakistan Stock Exchange (PSX) companies.
 
-Your responsibilities:
+RESPONSIBILITIES:
 1. Parse and analyze financial reports (PDFs)
 2. Search for recent news and developments
 3. Review company announcements
-4. Assess market sentiment
+4. Identify risks and opportunities
 
 PDF PARSING:
 When report URLs are provided in context, use get_report_text_for_llm to get structured summaries:
 - Returns: document_type, key_points, financial_data, decisions, announcements, risks
-- Prioritize: Latest QUARTERLY report > ANNUAL report > Board announcements
+- Prioritize: Latest QUARTERLY report, Latest ANNUAL report, recent Board meetings and other announcements.
 
-Guidelines:
+WORKFLOW:
+Plan tool calls up front. In the first batch, call search_news, search_company_info, and get_report_text_for_llm for the latest QUARTERLY report, latest ANNUAL report, and recent board meetings/announcements/others. Then make only additional calls to fill gaps or finish.
+
+GUIDELINES:
 - Focus on material news affecting stock prices
 - Look for: earnings, dividends, acquisitions, management changes
 - Extract specific numbers from report summaries
 - Identify risks and opportunities
-- Be objective in sentiment assessment
+- Plan tool calls up front; make most in one batch, then use additional calls only to fill gaps or finish.
 
+RESPONSE FORMAT:
 When complete, respond with JSON:
 {
     "symbol": "...",
     "news_items": [{"title": "...", "url": "...", "date": "...", "summary": "..."}],
-    "sentiment_score": -1.0 to 1.0,
-    "sentiment_label": "positive/negative/neutral",
     "key_events": ["..."],
     "report_highlights": ["Revenue: Rs. X", "Profit: Rs. Y", "EPS: Rs. Z", ...],
     "management_commentary": "Key strategic insights from reports",
@@ -404,7 +327,7 @@ class ResearchAgent(BaseAgent):
     def __init__(self, **kwargs):
         config = AgentConfig(
             name="ResearchAgent",
-            description="Gathers news, parses reports, and analyzes sentiment",
+            description="Gathers news and parses financial reports",
             system_prompt=RESEARCH_AGENT_SYSTEM_PROMPT,
             max_iterations=7,
             max_tokens=8192,  # Large output for detailed JSON with news/reports
@@ -447,25 +370,11 @@ class ResearchAgent(BaseAgent):
                 source=n.get("source"),
                 date=n.get("date"),
                 summary=n.get("summary"),
-                sentiment=n.get("sentiment"),
             ))
-
-        # Determine sentiment label
-        sentiment_score = result.get("sentiment_score", 0)
-        sentiment_label = result.get("sentiment_label", "neutral")
-        if sentiment_label not in ("positive", "negative", "neutral"):
-            if sentiment_score > 0.2:
-                sentiment_label = "positive"
-            elif sentiment_score < -0.2:
-                sentiment_label = "negative"
-            else:
-                sentiment_label = "neutral"
 
         return ResearchOutput(
             symbol=result.get("symbol", "UNKNOWN"),
             news_items=news_items,
-            sentiment_score=sentiment_score,
-            sentiment_label=sentiment_label,
             key_events=result.get("key_events", []),
             report_highlights=result.get("report_highlights", []),
             management_commentary=result.get("management_commentary", ""),
