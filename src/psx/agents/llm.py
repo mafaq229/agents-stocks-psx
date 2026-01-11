@@ -150,10 +150,18 @@ class LLMClient:
         kwargs: dict[str, Any] = {
             "model": self.model,
             "messages": all_messages,
-            "temperature": self.temperature,
             "max_completion_tokens": self.max_tokens,
         }
-        # TODO: investigate other args
+
+        # Some models (o-series, nano) don't support custom temperature
+        # Only include temperature if not using these model types
+        model_lower = self.model.lower()
+        supports_temperature = not any(
+            x in model_lower for x in ["o1", "o3", "nano", "o-"]
+        )
+        if supports_temperature:
+            kwargs["temperature"] = self.temperature
+
         if tools:
             kwargs["tools"] = [t.to_openai_format() for t in tools]
             kwargs["tool_choice"] = "auto"

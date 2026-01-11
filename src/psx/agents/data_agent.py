@@ -470,45 +470,26 @@ DATA_AGENT_TOOLS = [
 ]
 
 
-DATA_AGENT_SYSTEM_PROMPT = """You are a Data Agent specialized in retrieving stock market data for Pakistan Stock Exchange (PSX) companies.
+DATA_AGENT_SYSTEM_PROMPT = """You are a Data Agent that retrieves stock data for Pakistan Stock Exchange (PSX) companies.
 
-Your responsibilities:
-1. Fetch company data using get_company_data (auto-scrapes if not in DB)
-2. Get peers, their data, AND sector averages using get_sector_peers (all in one call)
-3. Report any data gaps or issues
+RESPONSIBILITIES:
+1. Fetch company data (quote, financials, ratios, reports, announcements)
+2. Get sector peers and their financial data for comparison
+3. Get sector averages for benchmarking
+4. Report any data gaps or errors encountered
 
-WORKFLOW (only 2 tool calls needed):
-1. Call get_company_data(symbol) - returns full company data, auto-scrapes if needed
-2. Call get_sector_peers(symbol) - returns peers, peer_data, AND sector_averages in one call
+WORKFLOW (2 tool calls):
+1. Call get_company_data(symbol) - fetches company data (auto-scrapes if not in DB)
+2. Call get_sector_peers(symbol) - fetches peers, peer_data, and sector_averages
 
-IMPORTANT: get_sector_peers now includes EVERYTHING:
-- Peer discovery (from DB or web search)
-- Peer financial data (auto-fetched)
-- Sector averages (for benchmarking)
+RESPONSE FORMAT:
+When done, respond with a SHORT confirmation (data is extracted directly from tool results):
+{"status": "complete", "symbol": "OGDC"}
 
-Guidelines:
-- get_company_data auto-scrapes if company not in database
-- get_sector_peers returns peers + peer_data + sector_averages in one response
-- Report any missing data fields as "data_gaps"
+If there were errors, include them:
+{"status": "partial", "symbol": "OGDC", "errors": ["peer discovery failed"]}
 
-When you have gathered all necessary data, respond with a JSON object containing:
-{
-    "symbol": "...",
-    "quote": {...},
-    "company": {...},
-    "financials": [...],
-    "ratios": [...],
-    "reports": [...],
-    "announcements": [...],
-    "sector": "...",
-    "peers": [...],
-    "peer_data": [{"symbol": "...", "price": ..., "pe_ratio": ..., "market_cap": ...}, ...],
-    "sector_averages": {"avg_pe": ..., "avg_market_cap": ..., ...},
-    "data_gaps": [...],
-    "data_freshness": "from_database" or "freshly_scraped"
-}
-
-Be efficient - only 2 tool calls are needed for complete data gathering."""
+Do NOT repeat the tool data in your response - just confirm completion."""
 
 
 class DataAgent(BaseAgent):
@@ -520,7 +501,7 @@ class DataAgent(BaseAgent):
             description="Retrieves stock data from PSX website and database",
             system_prompt=DATA_AGENT_SYSTEM_PROMPT,
             max_iterations=5,
-            max_tokens=6144,  # Moderate output for JSON with company data
+            max_tokens=4092,
         )
         super().__init__(config=config, tools=DATA_AGENT_TOOLS, **kwargs)
 
@@ -534,10 +515,41 @@ class DataAgent(BaseAgent):
         Returns:
             DataAgentOutput with retrieved data
         """
-        result = super().run(task, context)
+        # Run agent (LLM decides which tools to call)
+        super().run(task, context)
 
-        # Parse result into DataAgentOutput
-        return self._parse_to_output(result)
+        # Extract data directly from tool results (not from LLM output)
+        merged = self._merge_tool_results()
+
+        # Parse merged results into DataAgentOutput
+        return self._parse_to_output(merged)
+
+    def _merge_tool_results(self) -> dict[str, Any]:
+        """Merge tool results into a single dict for parsing.
+
+        Returns:
+            Merged dict with all tool data
+        """
+        merged: dict[str, Any] = {}
+
+        # Get company data from tool result
+        if "get_company_data" in self.tool_results:
+            company_data = self.tool_results["get_company_data"]
+            if isinstance(company_data, dict):
+                merged.update(company_data)
+
+        # Get peer data from tool result
+        if "get_sector_peers" in self.tool_results:
+            peer_data = self.tool_results["get_sector_peers"]
+            if isinstance(peer_data, dict) and "error" not in peer_data:
+                merged["peers"] = peer_data.get("peers", [])
+                merged["peer_data"] = peer_data.get("peer_data", [])
+                merged["sector_averages"] = peer_data.get("sector_averages")
+                # Use sector from peers if not in company data
+                if "sector" not in merged:
+                    merged["sector"] = peer_data.get("sector")
+
+        return merged
 
     def _parse_to_output(self, result: dict[str, Any]) -> DataAgentOutput:
         """Convert agent result to DataAgentOutput."""

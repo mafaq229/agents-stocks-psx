@@ -52,6 +52,9 @@ class BaseAgent:
         self.tools = {tool.name: tool for tool in tools}
         self.tool_list = tools
 
+        # Store tool results for direct access (avoids re-parsing from LLM output)
+        self.tool_results: dict[str, Any] = {}
+
         # Initialize LLM client
         app_config = get_config()
         self.llm = LLMClient(
@@ -80,6 +83,9 @@ class BaseAgent:
         logger.info(f"Agent '{self.config.name}' starting task: {task[:100]}...")
         logger.debug(f"[{self.config.name}] Full task: {task}")
         logger.debug(f"[{self.config.name}] Available tools: {list(self.tools.keys())}")
+
+        # Clear tool results from previous run
+        self.tool_results = {}
 
         # Build initial messages
         messages: list[dict[str, Any]] = []
@@ -154,6 +160,12 @@ class BaseAgent:
                     logger.debug(f"[{self.config.name}]    Arguments: {json.dumps(tool_call.arguments, default=str)[:500]}")
 
                     result = self._execute_tool(tool_call)
+
+                    # Store tool result for direct access (parsed)
+                    try:
+                        self.tool_results[tool_call.name] = json.loads(result)
+                    except json.JSONDecodeError:
+                        self.tool_results[tool_call.name] = result
 
                     # Log result preview
                     result_preview = result[:1000] + "..." if len(result) > 1000 else result
