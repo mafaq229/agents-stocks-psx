@@ -19,7 +19,7 @@ from psx.agents.schemas import (
 from psx.agents.data_agent import DataAgent
 from psx.agents.analyst_agent import AnalystAgent
 from psx.agents.research_agent import ResearchAgent
-from psx.agents.supervisor import SupervisorAgent, analyze_stock, compare_stocks
+from psx.agents.supervisor import SupervisorAgent, analyze_stock
 
 
 __all__ = [
@@ -49,5 +49,4 @@ __all__ = [
     "SupervisorAgent",
     # Convenience functions
     "analyze_stock",
-    "compare_stocks",
 ]

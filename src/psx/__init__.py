@@ -1,7 +1,7 @@
 """
 PSX Stock Analysis Platform
 
-A multi-agent framework for fundamental analysis, news/sentiment processing,
+A multi-agent framework for fundamental analysis, news processing,
 and stock valuation on Pakistan Stock Exchange.
 """
 
