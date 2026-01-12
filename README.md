@@ -98,28 +98,20 @@ uv run psx parse-pdf <url> --llm
 Requires `OPENAI_API_KEY` or `ANTHROPIC_API_KEY` environment variable.
 
 ```bash
-# Analyze a single stock
-uv run psx analyze LSECL
+# Analyze a stock (recommended: markdown output)
+uv run psx analyze OGDC --output markdown
 
 # Natural language query
-uv run psx analyze "Should I buy OGDC?"
+uv run psx analyze "Should I buy PPL?" --output markdown
 
-# Output formats
+# Quick summary view (default)
+uv run psx analyze LSECL
+
+# JSON output for programmatic use
 uv run psx analyze LSECL --output json
-uv run psx analyze LSECL --output markdown
 
 # Verbose mode (detailed logs saved to logs/)
-uv run psx analyze LSECL --verbose
-```
-
-### Compare Multiple Stocks
-
-```bash
-# Compare 2-5 stocks
-uv run psx compare OGDC PPL MARI
-
-# With output format
-uv run psx compare LSECL GHNI --output markdown --verbose
+uv run psx analyze LSECL --output markdown --verbose
 ```
 
 Reports are automatically saved to `output/` directory.

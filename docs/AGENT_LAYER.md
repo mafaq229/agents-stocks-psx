@@ -34,7 +34,7 @@ src/psx/agents/
 ```mermaid
 flowchart TB
     subgraph CLI["CLI Layer"]
-        CMD["psx analyze / compare"]
+        CMD["psx analyze"]
     end
 
     subgraph Supervisor["Supervisor Agent"]
@@ -58,7 +58,6 @@ flowchart TB
 
     subgraph Output["Output"]
         AR["AnalysisReport"]
-        CR["ComparisonReport"]
     end
 
     CMD --> SUP
@@ -72,7 +71,6 @@ flowchart TB
     AA --> T5
     AA --> T6
     SUP --> AR
-    SUP --> CR
 ```
 
 ### Analysis Sequence
@@ -113,31 +111,6 @@ sequenceDiagram
     Note over SUP: Step 4: Synthesize
     SUP->>LLM: Synthesize findings
     SUP-->>CLI: AnalysisReport
-```
-
-### Comparison Sequence
-
-```mermaid
-sequenceDiagram
-    participant CLI as psx compare
-    participant SUP as Supervisor
-    participant DA as DataAgent
-    participant AA as AnalystAgent
-
-    CLI->>SUP: compare([OGDC, PPL, MARI])
-
-    loop For each symbol
-        SUP->>DA: Get data for symbol
-        DA-->>SUP: DataAgentOutput
-    end
-
-    loop For each symbol
-        SUP->>AA: Analyze symbol
-        AA-->>SUP: AnalystOutput
-    end
-
-    Note over SUP: Rank and compare
-    SUP-->>CLI: ComparisonReport
 ```
 
 ---
@@ -441,13 +414,13 @@ class DataAgent(BaseAgent):
 ```
 output/
 ├── analyze_LSECL_20260102_143025.json
+├── analyze_LSECL_20260102_143025.md
 ├── analyze_OGDC_20260102_150000.json
-├── compare_LSECL_GHNI_20260102_160000.json
-└── compare_OGDC_PPL_MARI_20260102_170000.md
+└── analyze_OGDC_20260102_150000.md
 
 logs/
 ├── analyze_LSECL_20260102_143025.log
-├── compare_LSECL_GHNI_20260102_160000.log
+├── analyze_OGDC_20260102_150000.log
 └── ...
 ```
 
