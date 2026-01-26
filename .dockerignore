@@ -1,0 +1,54 @@
+# Git
+.git
+.gitignore
+.github
+
+# Python
+.venv
+venv
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache
+.mypy_cache
+.ruff_cache
+*.egg-info
+dist
+build
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Data (mount as volume instead)
+data/cache/*
+data/db/*.db
+data/documents/*
+
+# Output (mount as volume instead)
+output/*
+logs/*
+
+# Evaluation results
+evaluation/results/*
+
+# Documentation (not needed in container)
+*.md
+!README.md
+docs/
+dev/
+
+# Tests (not needed in production image)
+tests/
+
+# Notebooks
+*.ipynb
+.ipynb_checkpoints
