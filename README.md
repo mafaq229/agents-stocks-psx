@@ -1,4 +1,4 @@
-# PSX Stock Analysis Platform
+# Multi-Agent Financial Analysis Framework (PSX)
 
 A **multi-agent AI framework** for fundamental analysis and stock valuation on Pakistan Stock Exchange (PSX). Built with a modular architecture where specialized agents collaborate to deliver comprehensive investment analysis.
 
@@ -116,6 +116,131 @@ uv run psx analyze LSECL --output markdown --verbose
 
 Reports are automatically saved to `output/` directory.
 
+## Example Output
+
+<details>
+<summary><b>CLI Analysis Output</b> (click to expand)</summary>
+
+```
+$ uv run psx analyze OGDC --output markdown
+
+================================================================================
+                         OGDC INVESTMENT ANALYSIS
+================================================================================
+Generated: 2025-01-15 14:32:45
+
+FINANCIAL SNAPSHOT
+------------------
+Current Price:      PKR 142.50
+Market Cap:         PKR 385.2B
+P/E Ratio:          8.2x (Sector avg: 12.1x)
+P/B Ratio:          1.1x
+Dividend Yield:     4.8%
+52-Week Range:      PKR 98.50 - PKR 168.00
+
+VALUATION ANALYSIS
+------------------
+| Method          | Fair Value  | Upside   |
+|-----------------|-------------|----------|
+| P/E Valuation   | PKR 178.00  | +24.9%   |
+| Graham Number   | PKR 165.50  | +16.1%   |
+| Book Value      | PKR 158.20  | +11.0%   |
+| DCF Analysis    | PKR 192.00  | +34.7%   |
+|-----------------|-------------|----------|
+| Composite       | PKR 173.43  | +21.7%   |
+
+RECOMMENDATION: BUY
+Confidence: Medium (0.72)
+Health Score: 78/100
+
+KEY STRENGTHS
+- Strong dividend yield (4.8%)
+- Trading below sector P/E average
+- Healthy current ratio (1.85)
+- Consistent dividend history
+
+RED FLAGS
+- Revenue decline (-8.2% YoY)
+- Elevated debt-to-equity (1.4x)
+- Declining production volumes
+
+RECENT NEWS & EVENTS
+- [2025-01-12] Q2 FY25 earnings beat estimates by 8%
+- [2025-01-08] New gas discovery announced in Block 27
+- [2025-01-05] Board approves interim dividend of PKR 3.50
+
+================================================================================
+Analysis complete. Tokens: 12,847 | Cost: $0.08 | Time: 34.2s
+================================================================================
+```
+
+</details>
+
+<details>
+<summary><b>JSON Output Structure</b> (click to expand)</summary>
+
+```json
+{
+  "symbol": "OGDC",
+  "generated_at": "2025-01-15T14:32:45",
+  "financial_snapshot": {
+    "current_price": 142.50,
+    "market_cap": 385200000000,
+    "pe_ratio": 8.2,
+    "pb_ratio": 1.1,
+    "dividend_yield": 4.8
+  },
+  "valuations": [
+    {"method": "pe", "fair_value": 178.00, "upside_pct": 24.9},
+    {"method": "graham", "fair_value": 165.50, "upside_pct": 16.1},
+    {"method": "book_value", "fair_value": 158.20, "upside_pct": 11.0},
+    {"method": "dcf", "fair_value": 192.00, "upside_pct": 34.7}
+  ],
+  "composite_fair_value": 173.43,
+  "recommendation": "BUY",
+  "confidence": 0.72,
+  "health_score": 78,
+  "strengths": [
+    "Strong dividend yield (4.8%)",
+    "Trading below sector P/E average"
+  ],
+  "red_flags": [
+    "Revenue decline (-8.2% YoY)",
+    "Elevated debt-to-equity (1.4x)"
+  ],
+  "news_items": [
+    {
+      "date": "2025-01-12",
+      "title": "Q2 FY25 earnings beat estimates by 8%",
+      "source": "Business Recorder"
+    }
+  ],
+  "metrics": {
+    "tokens_used": 12847,
+    "cost_usd": 0.08,
+    "latency_seconds": 34.2
+  }
+}
+```
+
+</details>
+
+## How It Works
+
+```
+User Query ──> SupervisorAgent ──┬──> DataAgent ────> Scrape PSX website
+                                 │                    Fetch from database
+                                 │
+                                 ├──> ResearchAgent ─> Web search (Tavily)
+                                 │                     Parse PDF reports
+                                 │
+                                 └──> AnalystAgent ──> Calculate valuations
+                                                       Generate recommendation
+                                                            │
+                                                            v
+                                                    Final Analysis Report
+```
+
 ## Environment Variables
 
 ```bash
@@ -172,13 +297,49 @@ stocks-psx/
 ## Development
 
 ```bash
+# Install dev dependencies
+uv sync --group dev
+
 # Run tests
 uv run pytest tests/ -v
 
-# Run specific test file
-uv run pytest tests/test_parsers.py -v
+# Run linter
+uv run ruff check src/ tests/
+
+# Run type checker
+uv run mypy src/psx
 ```
 
-## License
+## Docker
 
-MIT
+### Build and Run
+
+```bash
+# Build image
+docker build -t psx-agents .
+
+# Run analysis
+docker run -e OPENAI_API_KEY=$OPENAI_API_KEY psx-agents analyze OGDC
+
+# Run with persistent data
+docker run -v $(pwd)/data:/app/data \
+  -e OPENAI_API_KEY=$OPENAI_API_KEY \
+  psx-agents analyze OGDC --output markdown
+```
+
+### Docker Compose
+
+```bash
+# Copy environment template
+cp .env.example .env
+# Edit .env with your API keys
+
+# Run analysis
+docker-compose run psx analyze OGDC
+
+# Scrape company data
+docker-compose run psx scrape OGDC ENGRO
+
+# List companies
+docker-compose run psx list
+```
