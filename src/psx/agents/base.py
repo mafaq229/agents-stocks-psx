@@ -5,11 +5,13 @@ Provides the foundation for all specialized agents.
 
 import json
 import logging
+import time
 from dataclasses import dataclass
 from typing import Any, Callable, Optional
 
 from psx.agents.llm import LLMClient, Tool, ToolCall
 from psx.core.config import get_config, LLMProvider
+from psx.observability.metrics import get_metrics
 
 
 logger = logging.getLogger(__name__)
@@ -111,17 +113,32 @@ class BaseAgent:
             iteration += 1
             logger.debug(f"[{self.config.name}] === Iteration {iteration}/{self.max_iterations} ===")
 
-            # Get LLM response
+            # Get LLM response with timing
+            metrics = get_metrics()
+            llm_start = time.time()
+
             response = self.llm.chat(
                 messages=messages,
                 tools=self.tool_list if self.tool_list else None,
                 system=self.config.system_prompt,
             )
 
+            llm_latency_ms = (time.time() - llm_start) * 1000
+
+            # Log metrics
+            metrics.log_llm_call(
+                agent=self.config.name,
+                model=self.llm.model,
+                prompt_tokens=response.usage.get("prompt_tokens", 0),
+                completion_tokens=response.usage.get("completion_tokens", 0),
+                latency_ms=llm_latency_ms,
+            )
+
             # Log response metadata
             logger.debug(
                 f"[{self.config.name}] Response: finish_reason={response.finish_reason}, "
-                f"tokens={response.usage.get('completion_tokens', 'N/A')}"
+                f"tokens={response.usage.get('completion_tokens', 'N/A')}, "
+                f"latency={llm_latency_ms:.0f}ms"
             )
 
             # Check for truncation (max_tokens reached)
@@ -159,7 +176,26 @@ class BaseAgent:
                     logger.info(f"[{self.config.name}] 🔧 Calling tool: {tool_call.name}")
                     logger.debug(f"[{self.config.name}]    Arguments: {json.dumps(tool_call.arguments, default=str)[:500]}")
 
-                    result = self._execute_tool(tool_call)
+                    tool_start = time.time()
+                    tool_error = None
+                    try:
+                        result = self._execute_tool(tool_call)
+                        tool_success = "error" not in result.lower() or '"error":' not in result
+                    except Exception as e:
+                        result = json.dumps({"error": str(e)})
+                        tool_success = False
+                        tool_error = str(e)
+
+                    tool_latency_ms = (time.time() - tool_start) * 1000
+
+                    # Log tool metrics
+                    metrics.log_tool_call(
+                        agent=self.config.name,
+                        tool_name=tool_call.name,
+                        success=tool_success,
+                        latency_ms=tool_latency_ms,
+                        error=tool_error,
+                    )
 
                     # Store tool result for direct access (parsed)
                     try:
@@ -169,7 +205,7 @@ class BaseAgent:
 
                     # Log result preview
                     result_preview = result[:1000] + "..." if len(result) > 1000 else result
-                    logger.debug(f"[{self.config.name}]    Result: {result_preview}")
+                    logger.debug(f"[{self.config.name}]    Result ({tool_latency_ms:.0f}ms): {result_preview}")
 
                     # Add tool result message
                     messages.append(

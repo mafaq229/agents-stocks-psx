@@ -9,6 +9,7 @@ from datetime import datetime
 from pathlib import Path
 
 from psx.agents.supervisor import SupervisorAgent
+from psx.observability import get_metrics, reset_metrics
 from psx.scraper import PSXScraper
 from psx.storage.data_store import DataStore
 from psx.storage.database import init_database
@@ -256,13 +257,20 @@ def analyze_command(args):
     if args.verbose:
         logging.getLogger().setLevel(logging.DEBUG)
         log_file = setup_file_logging("analyze", args.query)
-        print(f"📝 Verbose logs saved to: {log_file}\n")
+        print(f"Verbose logs saved to: {log_file}\n")
 
     print(f"Analyzing {args.query}...")
     print("This may take a few minutes as agents gather and analyze data.\n")
 
+    # Initialize metrics tracking
+    metrics = reset_metrics()
+    metrics.start_run()
+
     supervisor = SupervisorAgent()
     report = supervisor.analyze(args.query)
+
+    # End metrics tracking
+    metrics.end_run()
 
     # Save output to file
     output_path = save_output("analyze", args.query, report, args.output)
@@ -331,6 +339,11 @@ def analyze_command(args):
 
         print("\n" + "=" * 60)
         print("Run with --output markdown for detailed 7-section report")
+
+    # Print metrics summary
+    print("\n" + "=" * 60)
+    print(f"  {metrics.summary_line()}")
+    print("=" * 60)
 
 
 async def parse_pdf_command(args):
