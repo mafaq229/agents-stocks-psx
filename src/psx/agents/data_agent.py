@@ -14,6 +14,7 @@ from psx.agents.llm import Tool
 from psx.agents.schemas import DataAgentOutput
 from psx.core.models import ScrapedData
 from psx.core.config import get_config
+from psx.core.prompts import get_prompt_registry
 from psx.storage.data_store import DataStore
 from psx.scraper.psx_scraper import PSXScraper
 
@@ -470,38 +471,21 @@ DATA_AGENT_TOOLS = [
 ]
 
 
-DATA_AGENT_SYSTEM_PROMPT = """You are a Data Agent that retrieves stock data for Pakistan Stock Exchange (PSX) companies.
-
-RESPONSIBILITIES:
-1. Fetch company data (quote, financials, ratios, reports, announcements)
-2. Get sector peers and their financial data for comparison
-3. Get sector averages for benchmarking
-4. Report any data gaps or errors encountered
-
-WORKFLOW (2 tool calls):
-1. Call get_company_data(symbol) - fetches company data (auto-scrapes if not in DB)
-2. Call get_sector_peers(symbol) - fetches peers, peer_data, and sector_averages
-
-RESPONSE FORMAT:
-When done, respond with a SHORT confirmation (data is extracted directly from tool results):
-{"status": "complete", "symbol": "OGDC"}
-
-If there were errors, include them:
-{"status": "partial", "symbol": "OGDC", "errors": ["peer discovery failed"]}
-
-Do NOT repeat the tool data in your response - just confirm completion."""
-
-
 class DataAgent(BaseAgent):
     """Agent for retrieving stock data."""
 
     def __init__(self, **kwargs):
+        registry = get_prompt_registry()
+        system_prompt = registry.get_system_prompt("data_agent")
+        settings = registry.get_settings("data_agent")
+
         config = AgentConfig(
             name="DataAgent",
             description="Retrieves stock data from PSX website and database",
-            system_prompt=DATA_AGENT_SYSTEM_PROMPT,
+            system_prompt=system_prompt,
             max_iterations=5,
-            max_tokens=4092,
+            max_tokens=settings.get("max_tokens", 4096),
+            temperature=settings.get("temperature", 0.0),
         )
         super().__init__(config=config, tools=DATA_AGENT_TOOLS, **kwargs)
 
