@@ -10,6 +10,7 @@ from typing import Any, Optional
 from psx.agents.base import BaseAgent, AgentConfig
 from psx.agents.llm import Tool
 from psx.agents.schemas import AnalystOutput, ValuationDetail, PeerComparison
+from psx.core.prompts import get_prompt_registry
 from psx.tools.calculator import (
     ValuationCalculator,
     RatioCalculator,
@@ -451,56 +452,21 @@ ANALYST_AGENT_TOOLS = [
 ]
 
 
-ANALYST_AGENT_SYSTEM_PROMPT = """You are a Financial Analyst Agent specialized in fundamental analysis of Pakistan Stock Exchange (PSX) stocks.
-
-Your responsibilities:
-1. Calculate multiple valuations using different methods (P/E, Graham, Book Value, DCF)
-2. Analyze financial health and detect red flags
-3. Compare company metrics with sector averages
-4. Provide buy/sell/hold recommendations with reasoning
-
-Guidelines:
-- Be conservative in your estimates - it's better to underestimate value
-- Use multiple valuation methods and take the average or most appropriate
-- Compare valuation of industry peers and competitors as well
-- Always consider the margin of safety
-- Clearly explain your reasoning and any assumptions
-- If data is insufficient, note what's missing
-
-Recommendation scale:
-- STRONG_BUY: Significantly undervalued (>30% margin of safety) with strong fundamentals
-- BUY: Undervalued (15-30% margin of safety) with good fundamentals
-- HOLD: Fairly valued or mixed signals
-- SELL: Overvalued (negative margin of safety) with weak fundamentals
-- STRONG_SELL: Significantly overvalued with serious red flags
-
-When you have completed your analysis, respond with a JSON object:
-{
-    "symbol": "...",
-    "health_score": 0-100,
-    "valuations": [{"method": "...", "value": ...}, ...],
-    "fair_value": ...,
-    "current_price": ...,
-    "margin_of_safety": ...,
-    "red_flags": [...],
-    "strengths": [...],
-    "peer_comparison": {...},
-    "recommendation": "BUY/HOLD/SELL/...",
-    "confidence": 0.0-1.0,
-    "reasoning": "..."
-}"""
-
-
 class AnalystAgent(BaseAgent):
     """Agent for financial analysis and valuation."""
 
     def __init__(self, **kwargs):
+        registry = get_prompt_registry()
+        system_prompt = registry.get_system_prompt("analyst_agent")
+        settings = registry.get_settings("analyst_agent")
+
         config = AgentConfig(
             name="AnalystAgent",
             description="Performs financial analysis and stock valuation",
-            system_prompt=ANALYST_AGENT_SYSTEM_PROMPT,
+            system_prompt=system_prompt,
             max_iterations=8,
-            max_tokens=8192,  # Large output for detailed valuation analysis
+            max_tokens=settings.get("max_tokens", 8192),
+            temperature=settings.get("temperature", 0.0),
         )
         super().__init__(config=config, tools=ANALYST_AGENT_TOOLS, **kwargs)
 
