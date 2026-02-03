@@ -10,9 +10,10 @@ from typing import Any, Optional
 from psx.agents.base import BaseAgent, AgentConfig
 from psx.agents.llm import Tool
 from psx.agents.schemas import ResearchOutput, NewsItem
+from psx.core.config import get_config
+from psx.core.prompts import get_prompt_registry
 from psx.tools.web_search import TavilySearch
 from psx.tools.pdf_parser import PDFParser
-from psx.core.config import get_config
 
 
 logger = logging.getLogger(__name__)
@@ -284,53 +285,21 @@ RESEARCH_AGENT_TOOLS = [
 ]
 
 
-RESEARCH_AGENT_SYSTEM_PROMPT = """You are a Research Agent specialized in gathering qualitative information about Pakistan Stock Exchange (PSX) companies.
-
-RESPONSIBILITIES:
-1. Parse and analyze financial reports (PDFs)
-2. Search for recent news and developments
-3. Review company announcements
-4. Identify risks and opportunities
-
-PDF PARSING:
-When report URLs are provided in context, use get_report_text_for_llm to get structured summaries:
-- Returns: document_type, key_points, financial_data, decisions, announcements, risks
-- Prioritize: Latest QUARTERLY report, Latest ANNUAL report, recent Board meetings and other announcements.
-
-WORKFLOW:
-Plan tool calls up front. In the first batch, call search_news, search_company_info, and get_report_text_for_llm for the latest QUARTERLY report, latest ANNUAL report, and recent board meetings/announcements/others. Then make only additional calls to fill gaps or finish.
-
-GUIDELINES:
-- Focus on material news affecting stock prices
-- Look for: earnings, dividends, acquisitions, management changes
-- Extract specific numbers from report summaries
-- Identify risks and opportunities
-- Plan tool calls up front; make most in one batch, then use additional calls only to fill gaps or finish.
-
-RESPONSE FORMAT:
-When complete, respond with JSON:
-{
-    "symbol": "...",
-    "news_items": [{"title": "...", "url": "...", "date": "...", "summary": "..."}],
-    "key_events": ["..."],
-    "report_highlights": ["Revenue: Rs. X", "Profit: Rs. Y", "EPS: Rs. Z", ...],
-    "management_commentary": "Key strategic insights from reports",
-    "risks_identified": ["..."],
-    "opportunities": ["..."],
-    "competitor_insights": {...}
-}"""
-
-
 class ResearchAgent(BaseAgent):
     """Agent for research and news gathering."""
 
     def __init__(self, **kwargs):
+        registry = get_prompt_registry()
+        system_prompt = registry.get_system_prompt("research_agent")
+        settings = registry.get_settings("research_agent")
+
         config = AgentConfig(
             name="ResearchAgent",
             description="Gathers news and parses financial reports",
-            system_prompt=RESEARCH_AGENT_SYSTEM_PROMPT,
+            system_prompt=system_prompt,
             max_iterations=7,
-            max_tokens=8192,  # Large output for detailed JSON with news/reports
+            max_tokens=settings.get("max_tokens", 8192),
+            temperature=settings.get("temperature", 0.0),
         )
         super().__init__(config=config, tools=RESEARCH_AGENT_TOOLS, **kwargs)
 
