@@ -20,104 +20,10 @@ from psx.agents.data_agent import DataAgent
 from psx.agents.analyst_agent import AnalystAgent
 from psx.agents.research_agent import ResearchAgent
 from psx.core.config import get_config, LLMProvider
+from psx.core.prompts import get_prompt_registry
 
 
 logger = logging.getLogger(__name__)
-
-
-SUPERVISOR_SYSTEM_PROMPT = """You are a Supervisor Agent that orchestrates stock analysis.
-
-You coordinate three specialized agents:
-1. DataAgent - Retrieves all stock data including peer discovery
-2. AnalystAgent - Performs financial analysis and valuation
-3. ResearchAgent - Searches news, parses PDFs (qualitative research)
-
-Your responsibilities:
-1. Parse user queries to identify stocks to analyze
-2. Decide which agents to call and in what order
-3. Pass context between agents
-4. Synthesize results into a final report
-
-Workflow for "Analyze X":
-1. Call DataAgent to get stock data (includes peer discovery and peer data)
-2. Call ResearchAgent for news and PDF analysis
-3. Call AnalystAgent with data and research context
-4. Synthesize into final recommendation
-
-Always respond with a JSON object specifying next action:
-{
-    "action": "call_agent" | "synthesize" | "done",
-    "agent": "data" | "analyst" | "research",
-    "task": "...",
-    "symbols": ["..."],
-    "reasoning": "..."
-}
-
-Or when ready to synthesize:
-{
-    "action": "synthesize",
-    "reasoning": "..."
-}"""
-
-
-SYNTHESIS_PROMPT = """Given the collected data, research, and analysis, create a comprehensive investment report.
-
-DATA:
-{data_context}
-
-RESEARCH:
-{research_context}
-
-ANALYSIS:
-{analysis_context}
-
-Generate a JSON response with these sections:
-{{
-    "business_overview": "2-3 sentences: what the company does, key products, competitive position",
-    "industry_context": "1-2 sentences: sector trends, regulatory factors",
-    "ownership_structure": {{"promoter": "X%", "institutional": "Y%", "public": "Z%"}},
-    "management_notes": ["CEO name and any notable board decisions"],
-    "financial_snapshot": {{
-        "stock_price": "Rs. X",
-        "market_cap": "Rs. X",
-        "pe_ratio": "X",
-        "revenue": "Rs. X",
-        "profit": "Rs. X",
-        "profit_margin": "X%",
-        "eps": "Rs. X",
-        "roe": "X%",
-        "debt_to_equity": "X",
-        "current_ratio": "X"
-    }},
-    "valuation_table": [
-        {{"method": "P/E Based", "value": X, "inputs": "Sector PE × EPS"}},
-        {{"method": "Graham", "value": Y, "inputs": "..."}},
-        {{"method": "Book Value", "value": Z, "inputs": "..."}}
-    ],
-    "peer_comparison_table": [
-        {{"symbol": "XXX", "price": X, "pe_ratio": X, "roe": X, "market_cap": X}}
-    ],
-    "relative_position": "How company compares to peers - e.g., cheapest in sector",
-    "strengths": [
-        {{"point": "Strong market position", "reasoning": "Why this matters for investment"}},
-        {{"point": "...", "reasoning": "..."}}
-    ],
-    "risks": [
-        {{"point": "High debt levels", "reasoning": "Impact on investment thesis"}},
-        {{"point": "...", "reasoning": "..."}}
-    ],
-    "recent_developments": ["News item 1", "Announcement 2"],
-    "reasoning": "3-4 sentence investment thesis connecting valuation, fundamentals, risks, and timing",
-    "entry_price": X,
-    "target_price": Y,
-    "stop_loss": Z
-}}
-
-Important:
-- Extract actual numbers from the data provided
-- For ownership, use available data or note "Not available"
-- Be specific with financial figures
-- Reasoning should explain WHY the recommendation makes sense NOW"""
 
 
 class SupervisorAgent:
@@ -137,20 +43,28 @@ class SupervisorAgent:
         config = get_config()
         provider = llm_provider or config.llm.provider
 
+        # Load prompts from registry
+        registry = get_prompt_registry()
+        self.supervisor_prompt = registry.get_system_prompt("supervisor")
+        self.synthesis_prompt = registry.get_system_prompt("synthesis")
+
+        supervisor_settings = registry.get_settings("supervisor")
+        synthesis_settings = registry.get_settings("synthesis")
+
         # Supervisor uses fast model for routing decisions
         self.llm = LLMClient(
             provider=provider,
             model=config.get_model_for_agent("supervisor"),
-            temperature=0.0,
-            max_tokens=4096,  # Supervisor just emits routing JSON, not large outputs
+            temperature=supervisor_settings.get("temperature", 0.0),
+            max_tokens=supervisor_settings.get("max_tokens", 4096),
         )
 
         # Synthesis uses smart model for comprehensive report generation
         self.synthesis_llm = LLMClient(
             provider=provider,
             model=config.get_model_for_agent("synthesis"),
-            temperature=0.0,
-            max_tokens=8192,  # Large output for detailed synthesis
+            temperature=synthesis_settings.get("temperature", 0.0),
+            max_tokens=synthesis_settings.get("max_tokens", 8192),
         )
 
         self.max_iterations = max_iterations
@@ -260,7 +174,7 @@ class SupervisorAgent:
         # TODO: for first iteration, is there a better way? current: [{'role': 'user', 'content': 'Query: MARI\n\nCurrent state:\n=== Analysis State ===\nQuery: MARI\nSymbols: MARI\nIteration: 1/10\n\nWhat should we do next?'}]
         response = self.llm.chat(
             messages=messages,
-            system=SUPERVISOR_SYSTEM_PROMPT,
+            system=self.supervisor_prompt,
         )
 
         # Parse response as JSON (usual workflow of the system)
@@ -416,7 +330,7 @@ class SupervisorAgent:
             synthesis_response = self.synthesis_llm.chat(
                 messages=[{
                     "role": "user",
-                    "content": SYNTHESIS_PROMPT.format(
+                    "content": self.synthesis_prompt.format(
                         data_context=data_context,
                         research_context=research_context,
                         analysis_context=analysis_context,
