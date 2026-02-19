@@ -289,6 +289,35 @@ stocks-psx/
 - **Analysis Output**: `output/` - Saved analysis reports (JSON/Markdown)
 - **Logs**: `logs/` - Verbose debug logs
 
+## Evaluation
+
+The project includes an evaluation framework to measure component accuracy:
+
+```bash
+# Run all evaluations
+uv run python -m evaluation.run_evals --all
+
+# Run specific evaluator
+uv run python -m evaluation.run_evals --eval data_agent --verbose
+
+# Generate markdown report
+uv run python -m evaluation.run_evals --all --markdown
+```
+
+### Evaluation Results
+
+| Component | Metric | Target |
+|-----------|--------|--------|
+| DataAgent | Data completeness | >90% |
+| DataAgent | Field extraction accuracy | >95% |
+| AnalystAgent | Recommendation validity | 100% |
+| AnalystAgent | Valuation calculation | >85% |
+| ResearchAgent | News relevance | >80% |
+| PDFParser | Section detection | >85% |
+| Scraper | Selector success rate | >95% |
+
+*Run `uv run python -m evaluation.run_evals --all` to generate actual results.*
+
 ## Documentation
 
 - [Data Layer](docs/DATA_LAYER.md) - Database schema, storage, and data flow

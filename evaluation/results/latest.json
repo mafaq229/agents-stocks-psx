@@ -1,0 +1,99 @@
+{
+  "timestamp": "2026-02-06T15:06:51.067579",
+  "evaluations": {
+    "data_agent": {
+      "evaluator": "DataAgent",
+      "total_cases": 5,
+      "passed_cases": 3,
+      "pass_rate": 0.6,
+      "average_score": 0.52,
+      "results": [
+        {
+          "evaluator": "DataAgent",
+          "test_case_id": "ogdc_baseline",
+          "passed": true,
+          "score": 1.0,
+          "metrics": {
+            "symbol": "OGDC",
+            "completeness_score": 1.0,
+            "financials_rows": 24,
+            "ratio_rows": 16,
+            "range_accuracy": 1.0,
+            "sector_match": true
+          },
+          "errors": [],
+          "timestamp": "2026-02-06T15:06:51.073505"
+        },
+        {
+          "evaluator": "DataAgent",
+          "test_case_id": "engro_baseline",
+          "passed": false,
+          "score": 0.0,
+          "metrics": {
+            "symbol": "ENGRO"
+          },
+          "errors": [
+            "No cached data for ENGRO. Run scraper first."
+          ],
+          "timestamp": "2026-02-06T15:06:51.073522"
+        },
+        {
+          "evaluator": "DataAgent",
+          "test_case_id": "luck_baseline",
+          "passed": true,
+          "score": 0.8,
+          "metrics": {
+            "symbol": "LUCK",
+            "completeness_score": 1.0,
+            "financials_rows": 24,
+            "ratio_rows": 16,
+            "range_accuracy": 0.0,
+            "sector_match": true
+          },
+          "errors": [
+            "pe_ratio=49.0 outside range [5.0, 25.0]"
+          ],
+          "timestamp": "2026-02-06T15:06:51.073729"
+        },
+        {
+          "evaluator": "DataAgent",
+          "test_case_id": "ppl_baseline",
+          "passed": false,
+          "score": 0.0,
+          "metrics": {
+            "symbol": "PPL"
+          },
+          "errors": [
+            "No cached data for PPL. Run scraper first."
+          ],
+          "timestamp": "2026-02-06T15:06:51.073743"
+        },
+        {
+          "evaluator": "DataAgent",
+          "test_case_id": "hubco_baseline",
+          "passed": true,
+          "score": 0.8,
+          "metrics": {
+            "symbol": "HUBC",
+            "completeness_score": 1.0,
+            "financials_rows": 24,
+            "ratio_rows": 16,
+            "range_accuracy": 0.0,
+            "sector_match": true
+          },
+          "errors": [
+            "pe_ratio=15.84 outside range [3.0, 15.0]"
+          ],
+          "timestamp": "2026-02-06T15:06:51.073967"
+        }
+      ],
+      "timestamp": "2026-02-06T15:06:51.073974"
+    }
+  },
+  "summary": {
+    "total_evaluators": 1,
+    "total_test_cases": 5,
+    "total_passed": 3,
+    "overall_score": 0.52
+  }
+}
