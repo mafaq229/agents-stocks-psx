@@ -3,19 +3,18 @@
 These dataclasses define the structured data passed between agents.
 """
 
-from dataclasses import dataclass, field, asdict
+from dataclasses import asdict, dataclass, field
 from datetime import datetime
-from typing import Any, Optional, Literal
+from typing import Any, Literal
 
 from psx.core.models import (
-    QuoteData,
+    AnnouncementData,
     CompanyData,
     FinancialRow,
+    QuoteData,
     RatioRow,
     ReportData,
-    AnnouncementData,
 )
-
 
 # Type aliases
 Recommendation = Literal["STRONG_BUY", "BUY", "HOLD", "SELL", "STRONG_SELL"]
@@ -26,16 +25,16 @@ class PeerDataSnapshot:
     """Quick snapshot of peer company data for comparison."""
 
     symbol: str
-    name: Optional[str] = None
-    sector: Optional[str] = None
-    price: Optional[float] = None
-    change_pct: Optional[float] = None
-    pe_ratio: Optional[float] = None
-    market_cap: Optional[float] = None
-    eps: Optional[float] = None
-    profit_margin: Optional[float] = None
-    week_52_high: Optional[float] = None
-    week_52_low: Optional[float] = None
+    name: str | None = None
+    sector: str | None = None
+    price: float | None = None
+    change_pct: float | None = None
+    pe_ratio: float | None = None
+    market_cap: float | None = None
+    eps: float | None = None
+    profit_margin: float | None = None
+    week_52_high: float | None = None
+    week_52_low: float | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {k: v for k, v in asdict(self).items() if v is not None}
@@ -46,18 +45,18 @@ class DataAgentOutput:
     """Output from the Data Agent."""
 
     symbol: str
-    quote: Optional[QuoteData] = None
-    company: Optional[CompanyData] = None
+    quote: QuoteData | None = None
+    company: CompanyData | None = None
     financials: list[FinancialRow] = field(default_factory=list)
     ratios: list[RatioRow] = field(default_factory=list)
     reports: list[ReportData] = field(default_factory=list)
     announcements: list[AnnouncementData] = field(default_factory=list)
     peers: list[str] = field(default_factory=list)
     peer_data: list[PeerDataSnapshot] = field(default_factory=list)  # Rich peer data
-    sector: Optional[str] = None
-    sector_averages: Optional[dict[str, Any]] = None  # Sector benchmarks
+    sector: str | None = None
+    sector_averages: dict[str, Any] | None = None  # Sector benchmarks
     data_gaps: list[str] = field(default_factory=list)
-    data_freshness: Optional[str] = None
+    data_freshness: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -109,16 +108,16 @@ class DataAgentOutput:
 
         # Include report URLs for PDF parsing - CRITICAL for ResearchAgent
         if self.reports:
-            lines.append(f"\n--- Available Reports (PDFs to parse) ---")
-            for r in self.reports[:6]:  # Latest reports
-                lines.append(f"  [{r.report_type.upper()}] {r.period}: {r.url}")
+            lines.append("\n--- Available Reports (PDFs to parse) ---")
+            for rep in self.reports[:6]:  # Latest reports
+                lines.append(f"  [{rep.report_type.upper()}] {rep.period}: {rep.url}")
 
         # Include announcement URLs with PDFs
         if self.announcements:
             lines.append(f"\n--- Recent Announcements ({len(self.announcements)} items) ---")
             for a in self.announcements[:15]:
                 lines.append(f"  [{a.date}] {a.title}")
-                if a.url and 'javascript' not in a.url:
+                if a.url and "javascript" not in a.url:
                     lines.append(f"    PDF: {a.url}")
 
         if self.peers:
@@ -139,7 +138,7 @@ class DataAgentOutput:
 
         # Include sector benchmarks
         if self.sector_averages:
-            lines.append(f"\n--- Sector Averages ---")
+            lines.append("\n--- Sector Averages ---")
             for key, value in self.sector_averages.items():
                 if value is not None:
                     lines.append(f"  {key}: {value}")
@@ -157,7 +156,7 @@ class ValuationDetail:
     method: str
     value: float
     inputs: dict[str, Any] = field(default_factory=dict)
-    notes: Optional[str] = None
+    notes: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -168,13 +167,13 @@ class PeerComparison:
     """Comparison with a peer company."""
 
     symbol: str
-    name: Optional[str] = None
-    price: Optional[float] = None
-    pe_ratio: Optional[float] = None
-    pb_ratio: Optional[float] = None
-    dividend_yield: Optional[float] = None
-    market_cap: Optional[float] = None
-    roe: Optional[float] = None
+    name: str | None = None
+    price: float | None = None
+    pe_ratio: float | None = None
+    pb_ratio: float | None = None
+    dividend_yield: float | None = None
+    market_cap: float | None = None
+    roe: float | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {k: v for k, v in asdict(self).items() if v is not None}
@@ -187,9 +186,9 @@ class AnalystOutput:
     symbol: str
     health_score: float = 0.0  # 0-100
     valuations: list[ValuationDetail] = field(default_factory=list)
-    fair_value: Optional[float] = None
-    current_price: Optional[float] = None
-    margin_of_safety: Optional[float] = None
+    fair_value: float | None = None
+    current_price: float | None = None
+    margin_of_safety: float | None = None
     red_flags: list[str] = field(default_factory=list)
     strengths: list[str] = field(default_factory=list)
     peer_comparison: list[PeerComparison] = field(default_factory=list)
@@ -248,9 +247,9 @@ class NewsItem:
 
     title: str
     url: str
-    source: Optional[str] = None
-    date: Optional[str] = None
-    summary: Optional[str] = None
+    source: str | None = None
+    date: str | None = None
+    summary: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {k: v for k, v in asdict(self).items() if v is not None}
@@ -294,7 +293,7 @@ class ResearchOutput:
             lines.append(f"\nKey Events: {', '.join(self.key_events[:3])}")
 
         if self.report_highlights:
-            lines.append(f"\nReport Highlights:")
+            lines.append("\nReport Highlights:")
             for h in self.report_highlights[:5]:
                 lines.append(f"  - {h}")
 
@@ -339,7 +338,7 @@ class AnalysisState:
 
     def to_context_string(self) -> str:
         """Convert current state to context for LLM."""
-        lines = [f"=== Analysis State ==="]
+        lines = ["=== Analysis State ==="]
         lines.append(f"Query: {self.query}")
         lines.append(f"Symbols: {', '.join(self.symbols)}")
         lines.append(f"Iteration: {self.iteration}/{self.max_iterations}")
@@ -376,16 +375,20 @@ class AnalysisReport:
     industry_context: str = ""  # Sector trends, regulations
 
     # Section 2: Ownership & Management
-    ownership_structure: dict[str, Any] = field(default_factory=dict)  # Promoter/institutional/public
+    ownership_structure: dict[str, Any] = field(
+        default_factory=dict
+    )  # Promoter/institutional/public
     management_notes: list[str] = field(default_factory=list)  # CEO, board decisions
 
     # Section 3: Financial Snapshot (latest year)
-    financial_snapshot: dict[str, Any] = field(default_factory=dict)  # Revenue, profit, margins, ratios
+    financial_snapshot: dict[str, Any] = field(
+        default_factory=dict
+    )  # Revenue, profit, margins, ratios
 
     # Section 4: Valuation
     valuation_table: list[dict] = field(default_factory=list)  # [{method, value, inputs}]
-    fair_value: Optional[float] = None
-    margin_of_safety: Optional[float] = None
+    fair_value: float | None = None
+    margin_of_safety: float | None = None
 
     # Section 5: Peer Comparison
     peer_comparison_table: list[dict] = field(default_factory=list)
@@ -398,9 +401,9 @@ class AnalysisReport:
 
     # Section 7: Recommendation
     reasoning: str = ""  # Detailed 3-4 sentence explanation
-    entry_price: Optional[float] = None
-    target_price: Optional[float] = None
-    stop_loss: Optional[float] = None
+    entry_price: float | None = None
+    target_price: float | None = None
+    stop_loss: float | None = None
 
     generated_at: str = field(default_factory=lambda: datetime.utcnow().isoformat())
 
@@ -444,10 +447,10 @@ class AnalysisReport:
         lines.append("---")
         lines.append("\n## 1. Business Overview")
         if self.business_overview:
-            lines.append(f"\n### What the Company Does")
+            lines.append("\n### What the Company Does")
             lines.append(self.business_overview)
         if self.industry_context:
-            lines.append(f"\n### Industry & Sector")
+            lines.append("\n### Industry & Sector")
             lines.append(self.industry_context)
 
         # Section 2: Ownership & Management
@@ -493,7 +496,13 @@ class AnalysisReport:
         if current_price:
             lines.append(f"**Current Price:** Rs. {current_price:,.2f}")
         if self.margin_of_safety is not None:
-            status = "undervalued" if self.margin_of_safety > 0 else "overvalued" if self.margin_of_safety < 0 else "fairly valued"
+            status = (
+                "undervalued"
+                if self.margin_of_safety > 0
+                else "overvalued"
+                if self.margin_of_safety < 0
+                else "fairly valued"
+            )
             lines.append(f"**Margin of Safety:** {self.margin_of_safety:.1f}% ({status})")
 
         # Section 5: Peer Comparison
@@ -504,7 +513,9 @@ class AnalysisReport:
             if self.peer_comparison_table:
                 headers = ["Symbol"] + list(self.peer_comparison_table[0].keys())
                 headers = [h for h in headers if h != "symbol"]
-                lines.append(f"\n| Symbol | {' | '.join(h.replace('_', ' ').title() for h in headers if h != 'symbol')} |")
+                lines.append(
+                    f"\n| Symbol | {' | '.join(h.replace('_', ' ').title() for h in headers if h != 'symbol')} |"
+                )
                 lines.append(f"|--------|{'|'.join(['--------'] * (len(headers)))}|")
                 for peer in self.peer_comparison_table:
                     sym = peer.get("symbol", "N/A")
@@ -549,7 +560,7 @@ class AnalysisReport:
         lines.append(f"### Confidence: {self.confidence:.0%}")
 
         if self.reasoning:
-            lines.append(f"\n### Reasoning")
+            lines.append("\n### Reasoning")
             lines.append(self.reasoning)
 
         lines.append("\n### Suggested Action")
@@ -574,7 +585,7 @@ class ComparisonReport:
     query: str
     symbols: list[str]
     summary: str
-    winner: Optional[str] = None
+    winner: str | None = None
     rankings: list[dict[str, Any]] = field(default_factory=list)
     comparison_table: dict[str, dict[str, Any]] = field(default_factory=dict)
     analysis: dict[str, AnalystOutput] = field(default_factory=dict)
@@ -594,30 +605,30 @@ class ComparisonReport:
 
     def to_markdown(self) -> str:
         """Convert to markdown comparison report."""
-        lines = [f"# Stock Comparison Report"]
+        lines = ["# Stock Comparison Report"]
         lines.append(f"\n**Comparing:** {', '.join(self.symbols)}")
         lines.append(f"**Generated:** {self.generated_at}")
 
-        lines.append(f"\n## Summary")
+        lines.append("\n## Summary")
         lines.append(self.summary)
 
         if self.winner:
             lines.append(f"\n**Best Pick: {self.winner}**")
 
         if self.rankings:
-            lines.append(f"\n## Rankings")
+            lines.append("\n## Rankings")
             for i, r in enumerate(self.rankings, 1):
                 symbol = r.get("symbol", "")
                 score = r.get("score", 0)
                 lines.append(f"{i}. {symbol} (Score: {score})")
 
         if self.comparison_table:
-            lines.append(f"\n## Comparison Table")
+            lines.append("\n## Comparison Table")
             lines.append(f"\n| Metric | {' | '.join(self.symbols)} |")
             lines.append(f"|--------|{'|'.join(['--------'] * len(self.symbols))}|")
 
             # Get all metrics
-            all_metrics = set()
+            all_metrics: set[str] = set()
             for data in self.comparison_table.values():
                 all_metrics.update(data.keys())
 

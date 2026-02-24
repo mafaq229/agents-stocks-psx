@@ -1,11 +1,11 @@
 """Tests for PSX web scraper."""
 
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from psx.scraper.psx_scraper import PSXScraper
-from psx.core.models import QuoteData, CompanyData, EquityData, FinancialRow, RatioRow
+import pytest
+
 from psx.core.exceptions import ScraperError
+from psx.scraper.psx_scraper import PSXScraper
 
 
 class TestPSXScraper:

@@ -9,7 +9,7 @@ from datetime import datetime
 from pathlib import Path
 
 from psx.agents.supervisor import SupervisorAgent
-from psx.observability import get_metrics, reset_metrics
+from psx.observability import reset_metrics
 from psx.scraper import PSXScraper
 from psx.storage.data_store import DataStore
 from psx.storage.database import init_database
@@ -57,9 +57,9 @@ def setup_file_logging(command: str, query: str = "") -> Path:
     # Set up file handler
     file_handler = logging.FileHandler(log_file, encoding="utf-8")
     file_handler.setLevel(logging.DEBUG)
-    file_handler.setFormatter(logging.Formatter(
-        "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-    ))
+    file_handler.setFormatter(
+        logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+    )
 
     # Add to root logger
     logging.getLogger().addHandler(file_handler)
@@ -138,14 +138,14 @@ async def scrape_command(args):
                     store.save_quote(company_id, data.quote, data.equity)
 
                 if data.financials:
-                    for period_type, rows in data.financials.items():
+                    for _period_type, rows in data.financials.items():
                         store.save_financials(company_id, rows)
 
                 if data.ratios:
                     store.save_ratios(company_id, data.ratios)
 
                 if data.announcements:
-                    for category, anns in data.announcements.items():
+                    for _category, anns in data.announcements.items():
                         for ann in anns:
                             store.save_announcement(company_id, ann)
 
@@ -179,13 +179,13 @@ def print_summary(data):
     print("=" * 50)
 
     if data.company:
-        print(f"\n[Company]")
+        print("\n[Company]")
         print(f"  Sector: {data.company.sector or 'N/A'}")
         if data.company.description:
             print(f"  Description: {data.company.description[:100]}...")
 
     if data.quote:
-        print(f"\n[Quote]")
+        print("\n[Quote]")
         print(f"  Price: {data.quote.price}")
         print(f"  Change: {data.quote.change} ({data.quote.change_pct}%)")
         print(f"  Volume: {data.quote.volume}")
@@ -193,26 +193,26 @@ def print_summary(data):
             print(f"  P/E Ratio: {data.quote.pe_ratio}")
 
     if data.equity:
-        print(f"\n[Equity]")
+        print("\n[Equity]")
         print(f"  Market Cap: {data.equity.market_cap}")
         print(f"  Shares: {data.equity.shares_outstanding}")
 
     if data.financials:
-        print(f"\n[Financials]")
+        print("\n[Financials]")
         for period_type, rows in data.financials.items():
             print(f"  {period_type.title()}: {len(rows)} metrics")
 
     if data.ratios:
-        print(f"\n[Ratios]")
+        print("\n[Ratios]")
         print(f"  {len(data.ratios)} ratio entries")
 
     if data.announcements:
-        print(f"\n[Announcements]")
+        print("\n[Announcements]")
         for category, anns in data.announcements.items():
             print(f"  {category}: {len(anns)} items")
 
     if data.reports:
-        print(f"\n[Reports]")
+        print("\n[Reports]")
         print(f"  {len(data.reports)} financial reports")
 
     print("\n" + "=" * 50)
@@ -289,21 +289,21 @@ def analyze_command(args):
 
         # Business overview
         if report.business_overview:
-            print(f"\n[Business Overview]")
+            print("\n[Business Overview]")
             print(f"  {report.business_overview[:300]}...")
 
         # Recommendation
-        print(f"\n[Recommendation]")
+        print("\n[Recommendation]")
         print(f"  {report.recommendation} (Confidence: {report.confidence:.0%})")
 
         # Reasoning
         if report.reasoning:
-            print(f"\n[Investment Thesis]")
+            print("\n[Investment Thesis]")
             print(f"  {report.reasoning}")
 
         # Valuation
         if report.fair_value:
-            print(f"\n[Valuation]")
+            print("\n[Valuation]")
             print(f"  Fair Value: Rs. {report.fair_value:,.2f}")
             if report.margin_of_safety is not None:
                 status = "undervalued" if report.margin_of_safety > 0 else "overvalued"
@@ -311,7 +311,7 @@ def analyze_command(args):
 
         # Strengths
         if report.strengths:
-            print(f"\n[Strengths]")
+            print("\n[Strengths]")
             for s in report.strengths[:3]:
                 if isinstance(s, dict):
                     print(f"  • {s.get('point', s)}")
@@ -320,7 +320,7 @@ def analyze_command(args):
 
         # Risks
         if report.risks:
-            print(f"\n[Risks]")
+            print("\n[Risks]")
             for r in report.risks[:3]:
                 if isinstance(r, dict):
                     print(f"  • {r.get('point', r)}")
@@ -329,7 +329,7 @@ def analyze_command(args):
 
         # Suggested action
         if report.entry_price or report.target_price:
-            print(f"\n[Suggested Action]")
+            print("\n[Suggested Action]")
             if report.entry_price:
                 print(f"  Entry Price: Rs. {report.entry_price:,.2f}")
             if report.target_price:
@@ -358,7 +358,7 @@ async def parse_pdf_command(args):
             logger.info(f"Parsing local file: {args.url}")
             report = parser.parse_from_file(args.url)
 
-        print(f"\n✓ Successfully parsed PDF")
+        print("\n✓ Successfully parsed PDF")
         print(f"  Pages: {report.pages}")
         print(f"  Text length: {len(report.raw_text)} chars")
         print(f"  Sections found: {list(report.sections.keys())}")
@@ -366,7 +366,7 @@ async def parse_pdf_command(args):
         if args.text:
             # Output raw text
             print("\n--- Extracted Text ---")
-            print(report.raw_text[:args.max_chars] if args.max_chars else report.raw_text)
+            print(report.raw_text[: args.max_chars] if args.max_chars else report.raw_text)
         elif args.llm:
             # Output LLM-formatted text
             print("\n--- LLM-Formatted Text ---")
@@ -411,7 +411,7 @@ def main():
     )
 
     # List command
-    list_parser = subparsers.add_parser("list", help="List scraped companies")
+    subparsers.add_parser("list", help="List scraped companies")
 
     # Show command
     show_parser = subparsers.add_parser("show", help="Show company data")

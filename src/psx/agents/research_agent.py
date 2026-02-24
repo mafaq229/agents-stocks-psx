@@ -5,22 +5,21 @@ Responsible for gathering external information about companies.
 
 import json
 import logging
-from typing import Any, Optional
+from typing import Any
 
-from psx.agents.base import BaseAgent, AgentConfig
+from psx.agents.base import AgentConfig, BaseAgent
 from psx.agents.llm import Tool
-from psx.agents.schemas import ResearchOutput, NewsItem
+from psx.agents.schemas import NewsItem, ResearchOutput
 from psx.core.config import get_config
 from psx.core.prompts import get_prompt_registry
-from psx.tools.web_search import TavilySearch
 from psx.tools.pdf_parser import PDFParser
-
+from psx.tools.web_search import TavilySearch
 
 logger = logging.getLogger(__name__)
 
 
 # Tool implementations
-def _get_search_client() -> Optional[TavilySearch]:
+def _get_search_client() -> TavilySearch | None:
     """Get Tavily search client if API key is available."""
     config = get_config()
     if config.tavily_api_key:
@@ -55,9 +54,7 @@ def search_news(query: str, max_results: int = 5) -> dict[str, Any]:
         return {"error": str(e)}
 
 
-def search_company_info(
-    company_name: str, symbol: Optional[str] = None
-) -> dict[str, Any]:
+def search_company_info(company_name: str, symbol: str | None = None) -> dict[str, Any]:
     """Search for general information about a company.
 
     Args:
@@ -84,9 +81,7 @@ def search_company_info(
         return {"error": str(e)}
 
 
-def search_competitors(
-    company_name: str, sector: Optional[str] = None
-) -> dict[str, Any]:
+def search_competitors(company_name: str, sector: str | None = None) -> dict[str, Any]:
     """Search for competitor information.
 
     Args:
@@ -157,6 +152,7 @@ def get_report_text_for_llm(url: str, max_chars: int = 50000) -> dict[str, Any]:
     import asyncio
     import json
     import re
+
     from psx.agents.llm import LLMClient
 
     try:
@@ -193,16 +189,18 @@ def get_report_text_for_llm(url: str, max_chars: int = 50000) -> dict[str, Any]:
         logger.info(f"[PDFSummarizer] Summarizing PDF with {summarizer_model} ({len(text)} chars)")
 
         response = llm.chat(
-            messages=[{
-                "role": "user",
-                "content": text[:max_chars],
-            }],
+            messages=[
+                {
+                    "role": "user",
+                    "content": text[:max_chars],
+                }
+            ],
             system=PDF_SUMMARIZER_SYSTEM,
         )
 
         # Parse the summary JSON
         try:
-            json_match = re.search(r'\{[\s\S]*\}', response.content)
+            json_match = re.search(r"\{[\s\S]*\}", response.content)
             if json_match:
                 summary = json.loads(json_match.group())
             else:
@@ -220,6 +218,7 @@ def get_report_text_for_llm(url: str, max_chars: int = 50000) -> dict[str, Any]:
     except Exception as e:
         logger.error(f"PDF summarization failed: {e}")
         return {"error": str(e), "url": url}
+
 
 # Tool definitions
 RESEARCH_AGENT_TOOLS = [
@@ -303,7 +302,7 @@ class ResearchAgent(BaseAgent):
         )
         super().__init__(config=config, tools=RESEARCH_AGENT_TOOLS, **kwargs)
 
-    def run(self, task: str, context: Optional[dict[str, Any]] = None) -> ResearchOutput:
+    def run(self, task: str, context: dict[str, Any] | None = None) -> ResearchOutput:
         """Run the research agent and return structured output.
 
         Args:
@@ -324,7 +323,7 @@ class ResearchAgent(BaseAgent):
         if "output" in result:
             try:
                 if isinstance(result["output"], str):
-                    json_match = re.search(r'\{[\s\S]*\}', result["output"])
+                    json_match = re.search(r"\{[\s\S]*\}", result["output"])
                     if json_match:
                         result = json.loads(json_match.group())
             except json.JSONDecodeError:
@@ -333,13 +332,15 @@ class ResearchAgent(BaseAgent):
         # Parse news items
         news_items = []
         for n in result.get("news_items", []):
-            news_items.append(NewsItem(
-                title=n.get("title", ""),
-                url=n.get("url", ""),
-                source=n.get("source"),
-                date=n.get("date"),
-                summary=n.get("summary"),
-            ))
+            news_items.append(
+                NewsItem(
+                    title=n.get("title", ""),
+                    url=n.get("url", ""),
+                    source=n.get("source"),
+                    date=n.get("date"),
+                    summary=n.get("summary"),
+                )
+            )
 
         return ResearchOutput(
             symbol=result.get("symbol", "UNKNOWN"),

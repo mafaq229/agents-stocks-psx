@@ -5,19 +5,18 @@ Responsible for calculating valuations, detecting red flags, and making recommen
 
 import json
 import logging
-from typing import Any, Optional
+from typing import Any
 
-from psx.agents.base import BaseAgent, AgentConfig
+from psx.agents.base import AgentConfig, BaseAgent
 from psx.agents.llm import Tool
-from psx.agents.schemas import AnalystOutput, ValuationDetail, PeerComparison
+from psx.agents.schemas import AnalystOutput, PeerComparison, ValuationDetail
 from psx.core.prompts import get_prompt_registry
 from psx.tools.calculator import (
-    ValuationCalculator,
     RatioCalculator,
+    ValuationCalculator,
     detect_red_flags,
     detect_strengths,
 )
-
 
 logger = logging.getLogger(__name__)
 
@@ -61,9 +60,7 @@ def calculate_graham_number(eps: float, book_value_per_share: float) -> dict[str
     }
 
 
-def calculate_book_value(
-    book_value_per_share: float, pb_ratio: float = 1.0
-) -> dict[str, Any]:
+def calculate_book_value(book_value_per_share: float, pb_ratio: float = 1.0) -> dict[str, Any]:
     """Calculate fair value based on book value.
 
     Args:
@@ -86,7 +83,7 @@ def calculate_dcf(
     free_cash_flows: list[float],
     discount_rate: float = 0.10,
     terminal_growth_rate: float = 0.03,
-    shares_outstanding: Optional[int] = None,
+    shares_outstanding: int | None = None,
 ) -> dict[str, Any]:
     """Calculate intrinsic value using DCF model.
 
@@ -110,9 +107,7 @@ def calculate_dcf(
     }
 
 
-def calculate_margin_of_safety(
-    intrinsic_value: float, current_price: float
-) -> dict[str, Any]:
+def calculate_margin_of_safety(intrinsic_value: float, current_price: float) -> dict[str, Any]:
     """Calculate margin of safety.
 
     Args:
@@ -126,15 +121,15 @@ def calculate_margin_of_safety(
 
 
 def calculate_financial_ratios(
-    current_assets: Optional[float] = None,
-    current_liabilities: Optional[float] = None,
-    total_debt: Optional[float] = None,
-    total_equity: Optional[float] = None,
-    net_income: Optional[float] = None,
-    revenue: Optional[float] = None,
-    total_assets: Optional[float] = None,
-    ebit: Optional[float] = None,
-    interest_expense: Optional[float] = None,
+    current_assets: float | None = None,
+    current_liabilities: float | None = None,
+    total_debt: float | None = None,
+    total_equity: float | None = None,
+    net_income: float | None = None,
+    revenue: float | None = None,
+    total_assets: float | None = None,
+    ebit: float | None = None,
+    interest_expense: float | None = None,
 ) -> dict[str, Any]:
     """Calculate multiple financial ratios from provided data.
 
@@ -147,19 +142,13 @@ def calculate_financial_ratios(
     ratios = {}
 
     if current_assets and current_liabilities:
-        ratios["current_ratio"] = RatioCalculator.current_ratio(
-            current_assets, current_liabilities
-        )
+        ratios["current_ratio"] = RatioCalculator.current_ratio(current_assets, current_liabilities)
 
     if total_debt is not None and total_equity:
-        ratios["debt_to_equity"] = RatioCalculator.debt_to_equity(
-            total_debt, total_equity
-        )
+        ratios["debt_to_equity"] = RatioCalculator.debt_to_equity(total_debt, total_equity)
 
     if total_debt is not None and total_assets:
-        ratios["debt_to_assets"] = RatioCalculator.debt_to_assets(
-            total_debt, total_assets
-        )
+        ratios["debt_to_assets"] = RatioCalculator.debt_to_assets(total_debt, total_assets)
 
     if net_income is not None and total_equity:
         ratios["roe"] = RatioCalculator.return_on_equity(net_income, total_equity)
@@ -171,22 +160,20 @@ def calculate_financial_ratios(
         ratios["profit_margin"] = RatioCalculator.profit_margin(net_income, revenue)
 
     if ebit and interest_expense:
-        ratios["interest_coverage"] = RatioCalculator.interest_coverage(
-            ebit, interest_expense
-        )
+        ratios["interest_coverage"] = RatioCalculator.interest_coverage(ebit, interest_expense)
 
     return ratios
 
 
 def analyze_financial_health(
-    current_ratio: Optional[float] = None,
-    quick_ratio: Optional[float] = None,
-    debt_to_equity: Optional[float] = None,
-    interest_coverage: Optional[float] = None,
-    profit_margin: Optional[float] = None,
-    roe: Optional[float] = None,
-    revenue_growth: Optional[float] = None,
-    earnings_growth: Optional[float] = None,
+    current_ratio: float | None = None,
+    quick_ratio: float | None = None,
+    debt_to_equity: float | None = None,
+    interest_coverage: float | None = None,
+    profit_margin: float | None = None,
+    roe: float | None = None,
+    revenue_growth: float | None = None,
+    earnings_growth: float | None = None,
 ) -> dict[str, Any]:
     """Analyze financial health and detect red flags and strengths.
 
@@ -238,10 +225,10 @@ def analyze_financial_health(
 def compare_with_sector(
     company_pe: float,
     sector_pe: float,
-    company_pb: Optional[float] = None,
-    sector_pb: Optional[float] = None,
-    company_roe: Optional[float] = None,
-    sector_roe: Optional[float] = None,
+    company_pb: float | None = None,
+    sector_pb: float | None = None,
+    company_roe: float | None = None,
+    sector_roe: float | None = None,
 ) -> dict[str, Any]:
     """Compare company metrics with sector averages.
 
@@ -470,7 +457,7 @@ class AnalystAgent(BaseAgent):
         )
         super().__init__(config=config, tools=ANALYST_AGENT_TOOLS, **kwargs)
 
-    def run(self, task: str, context: Optional[dict[str, Any]] = None) -> AnalystOutput:
+    def run(self, task: str, context: dict[str, Any] | None = None) -> AnalystOutput:
         """Run the analyst agent and return structured output.
 
         Args:
@@ -491,7 +478,7 @@ class AnalystAgent(BaseAgent):
         if "output" in result:
             try:
                 if isinstance(result["output"], str):
-                    json_match = re.search(r'\{[\s\S]*\}', result["output"])
+                    json_match = re.search(r"\{[\s\S]*\}", result["output"])
                     if json_match:
                         result = json.loads(json_match.group())
             except json.JSONDecodeError:
@@ -500,23 +487,27 @@ class AnalystAgent(BaseAgent):
         # Parse valuations
         valuations = []
         for v in result.get("valuations", []):
-            valuations.append(ValuationDetail(
-                method=v.get("method", "Unknown"),
-                value=v.get("value", 0),
-                inputs=v.get("inputs", {}),
-                notes=v.get("notes"),
-            ))
+            valuations.append(
+                ValuationDetail(
+                    method=v.get("method", "Unknown"),
+                    value=v.get("value", 0),
+                    inputs=v.get("inputs", {}),
+                    notes=v.get("notes"),
+                )
+            )
 
         # Parse peer comparison
         peer_comparison = []
         if "peer_comparison" in result and isinstance(result["peer_comparison"], list):
             for p in result["peer_comparison"]:
-                peer_comparison.append(PeerComparison(
-                    symbol=p.get("symbol", ""),
-                    name=p.get("name"),
-                    price=p.get("price"),
-                    pe_ratio=p.get("pe_ratio"),
-                ))
+                peer_comparison.append(
+                    PeerComparison(
+                        symbol=p.get("symbol", ""),
+                        name=p.get("name"),
+                        price=p.get("price"),
+                        pe_ratio=p.get("pe_ratio"),
+                    )
+                )
 
         # Determine recommendation
         recommendation = result.get("recommendation", "HOLD")

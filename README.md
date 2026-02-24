@@ -372,3 +372,74 @@ docker-compose run psx scrape OGDC ENGRO
 # List companies
 docker-compose run psx list
 ```
+
+## Error Handling
+
+The system handles failures gracefully with automatic recovery and fallbacks:
+
+### Scraper Failures
+
+| Error Type | Handling Strategy |
+|------------|-------------------|
+| Network timeout | Retry 3x with exponential backoff (1s, 2s, 4s) |
+| Rate limiting (429) | Wait 60s, then retry |
+| Selector not found | Log warning, return empty field, continue |
+| Page load failure | Fall back to cached data if available |
+
+### PDF Parsing
+
+| Error Type | Handling Strategy |
+|------------|-------------------|
+| Download failure | Retry 2x, then skip with warning |
+| Corrupted PDF | Return partial extraction with error flag |
+| Extraction failure (pdfplumber) | Fall back to pypdf |
+| No text extracted | Return metadata only with warning |
+
+### LLM API Failures
+
+| Error Type | Handling Strategy |
+|------------|-------------------|
+| Rate limit (429) | Exponential backoff, max 3 retries |
+| Context too long | Truncate context, log warning |
+| Malformed JSON response | Parse partial JSON, fill missing with defaults |
+| API unavailable (5xx) | Circuit breaker pattern, fail after 5 failures |
+| Response truncated | Return partial results with `truncated` flag |
+
+### Agent Coordination
+
+| Error Type | Handling Strategy |
+|------------|-------------------|
+| Agent timeout | Return partial results after configured timeout |
+| Missing data from DataAgent | Skip dependent calculations, note in output |
+| Tool execution failure | Log error, continue with available data |
+| Max iterations reached | Return best available results with warning |
+
+### Using Retry Utilities
+
+```python
+from psx.utils.retry import with_retry, CircuitBreaker
+
+# Decorator for automatic retries
+@with_retry(max_attempts=3, exceptions=(httpx.TimeoutException,))
+async def fetch_data(url: str):
+    async with httpx.AsyncClient() as client:
+        return await client.get(url)
+
+# Circuit breaker for protecting against cascading failures
+breaker = CircuitBreaker(failure_threshold=5, recovery_timeout=30)
+
+async def call_api():
+    if not breaker.allow_request():
+        raise CircuitBreakerOpen("Service unavailable")
+    try:
+        result = await api_call()
+        breaker.record_success()
+        return result
+    except Exception:
+        breaker.record_failure()
+        raise
+```
+
+## License
+
+MIT

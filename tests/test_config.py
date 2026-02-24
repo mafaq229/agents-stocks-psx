@@ -1,16 +1,17 @@
 """Tests for configuration management."""
 
-import pytest
 import os
 from unittest.mock import patch
 
+import pytest
+
 from psx.core.config import (
-    LLMConfig,
+    DEFAULT_MODELS,
     AgentModels,
     Config,
+    LLMConfig,
     get_config,
     reset_config,
-    DEFAULT_MODELS,
 )
 
 

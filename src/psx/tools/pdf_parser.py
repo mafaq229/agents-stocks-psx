@@ -4,12 +4,12 @@ This tool is designed to be called by agents for on-demand PDF analysis.
 It handles downloading, text extraction, and structured data parsing.
 """
 
-import re
 import io
 import logging
-from typing import Dict, List, Optional, Any
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any
 
 import httpx
 import pdfplumber
@@ -25,7 +25,7 @@ class ParsedSection:
     """A parsed section from a financial report."""
 
     title: str
-    data: Dict[str, Any] = field(default_factory=dict)
+    data: dict[str, Any] = field(default_factory=dict)
     raw_text: str = ""
 
 
@@ -36,8 +36,8 @@ class ParsedReport:
     source_url: str
     pages: int
     raw_text: str
-    sections: Dict[str, ParsedSection] = field(default_factory=dict)
-    metadata: Dict[str, str] = field(default_factory=dict)
+    sections: dict[str, ParsedSection] = field(default_factory=dict)
+    metadata: dict[str, str] = field(default_factory=dict)
 
 
 class PDFParser:
@@ -106,7 +106,6 @@ class PDFParser:
         "borrowings": r"(?i)(?:short|long)[- ]term\s+borrowings?",
         "share_capital": r"(?i)(?:issued\s+)?share\s+capital",
         "retained_earnings": r"(?i)(?:un)?retained\s+(?:earnings?|profits?)",
-
         # Income Statement items
         "revenue": r"(?i)(?:net\s+)?(?:revenue|sales|turnover)",
         "cost_of_sales": r"(?i)cost\s+of\s+(?:sales|goods\s+sold|revenue)",
@@ -117,14 +116,13 @@ class PDFParser:
         "tax_expense": r"(?i)(?:income\s+)?tax(?:ation)?\s*(?:expense)?",
         "profit_after_tax": r"(?i)profit\s+(?:after\s+tax|for\s+the\s+(?:year|period))",
         "eps": r"(?i)(?:basic\s+)?earnings?\s+per\s+share",
-
         # Cash Flow items
         "operating_cash_flow": r"(?i)(?:net\s+)?cash\s+(?:from|(?:used\s+)?in)\s+operating",
         "investing_cash_flow": r"(?i)(?:net\s+)?cash\s+(?:from|(?:used\s+)?in)\s+investing",
         "financing_cash_flow": r"(?i)(?:net\s+)?cash\s+(?:from|(?:used\s+)?in)\s+financing",
     }
 
-    def __init__(self, cache_dir: Optional[str] = None):
+    def __init__(self, cache_dir: str | None = None):
         """
         Initialize PDF parser.
 
@@ -171,7 +169,7 @@ class PDFParser:
                 return content
 
         except httpx.HTTPError as e:
-            raise PDFParseError(f"Failed to download PDF: {e}", url=url)
+            raise PDFParseError(f"Failed to download PDF: {e}", url=url) from e
 
     def extract_text(self, pdf_bytes: bytes) -> str:
         """
@@ -195,17 +193,17 @@ class PDFParser:
             if not text_parts:
                 logger.info("pdfplumber returned no text, trying pypdf fallback")
                 reader = PdfReader(io.BytesIO(pdf_bytes))
-                for page_num, page in enumerate(reader.pages, 1):
-                    page_text = page.extract_text()
+                for page_num, pdf_page in enumerate(reader.pages, 1):
+                    page_text = pdf_page.extract_text()
                     if page_text:
                         text_parts.append(f"--- Page {page_num} ---\n{page_text}")
 
             return "\n\n".join(text_parts)
 
         except Exception as e:
-            raise PDFParseError(f"Failed to extract text from PDF: {e}")
+            raise PDFParseError(f"Failed to extract text from PDF: {e}") from e
 
-    def extract_text_by_page(self, pdf_bytes: bytes) -> List[str]:
+    def extract_text_by_page(self, pdf_bytes: bytes) -> list[str]:
         """
         Extract text from PDF, returning list of page texts.
 
@@ -230,9 +228,9 @@ class PDFParser:
             return pages
 
         except Exception as e:
-            raise PDFParseError(f"Failed to extract text from PDF: {e}")
+            raise PDFParseError(f"Failed to extract text from PDF: {e}") from e
 
-    def get_metadata(self, pdf_bytes: bytes) -> Dict[str, str]:
+    def get_metadata(self, pdf_bytes: bytes) -> dict[str, str]:
         """
         Extract PDF metadata.
 
@@ -244,7 +242,7 @@ class PDFParser:
         """
         try:
             reader = PdfReader(io.BytesIO(pdf_bytes))
-            meta = reader.metadata or {}
+            meta: dict = dict(reader.metadata or {})
 
             return {
                 "title": meta.get("/Title", ""),
@@ -259,7 +257,7 @@ class PDFParser:
             logger.warning(f"Failed to extract metadata: {e}")
             return {}
 
-    def identify_sections(self, text: str) -> Dict[str, tuple]:
+    def identify_sections(self, text: str) -> dict[str, tuple]:
         """
         Identify financial statement sections in text.
 
@@ -292,7 +290,7 @@ class PDFParser:
 
         return result
 
-    def extract_numbers(self, text: str) -> List[Dict[str, Any]]:
+    def extract_numbers(self, text: str) -> list[dict[str, Any]]:
         """
         Extract number values with context from text.
 
@@ -327,16 +325,18 @@ class PDFParser:
             end = min(len(text), match.end() + 20)
             context = text[start:end].replace("\n", " ").strip()
 
-            results.append({
-                "value": value,
-                "raw": value_str,
-                "context": context,
-                "position": match.start(),
-            })
+            results.append(
+                {
+                    "value": value,
+                    "raw": value_str,
+                    "context": context,
+                    "position": match.start(),
+                }
+            )
 
         return results
 
-    def extract_line_items(self, text: str) -> Dict[str, Optional[float]]:
+    def extract_line_items(self, text: str) -> dict[str, float | None]:
         """
         Extract known financial line items from text.
 
@@ -346,13 +346,13 @@ class PDFParser:
         Returns:
             Dict mapping line item names to extracted values
         """
-        results = {}
+        results: dict[str, float | None] = {}
 
         for item_name, pattern in self.LINE_ITEM_PATTERNS.items():
             match = re.search(pattern, text)
             if match:
                 # Look for number after the match
-                after_text = text[match.end():match.end() + 100]
+                after_text = text[match.end() : match.end() + 100]
                 numbers = re.findall(r"[\(\-]?\d{1,3}(?:,\d{3})*(?:\.\d+)?[\)]?", after_text)
 
                 if numbers:
@@ -491,12 +491,12 @@ class PDFParser:
         import hashlib
 
         # Try to extract PSX document ID from URL query params
-        id_match = re.search(r'[?&]id=(\d+)', url)
+        id_match = re.search(r"[?&]id=(\d+)", url)
         if id_match:
             return f"{id_match.group(1)}.pdf"
 
         # Try to extract ID from path (e.g., /download/document/264877)
-        path_match = re.search(r'/(\d{5,})(?:\.\w+)?$', url)
+        path_match = re.search(r"/(\d{5,})(?:\.\w+)?$", url)
         if path_match:
             return f"{path_match.group(1)}.pdf"
 

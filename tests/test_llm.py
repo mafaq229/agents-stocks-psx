@@ -1,10 +1,8 @@
 """Tests for LLM client."""
 
-import pytest
-import json
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
-from psx.agents.llm import ToolCall, LLMResponse, Tool, LLMClient
+from psx.agents.llm import LLMClient, LLMResponse, Tool, ToolCall
 
 
 class TestToolCall:

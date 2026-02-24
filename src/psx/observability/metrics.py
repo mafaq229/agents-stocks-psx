@@ -1,9 +1,8 @@
 """Metrics collection for agent runs."""
 
+import time
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Optional
-import time
 
 
 @dataclass
@@ -31,7 +30,7 @@ class ToolCallMetrics:
     tool_name: str
     success: bool
     latency_ms: float
-    error: Optional[str] = None
+    error: str | None = None
     timestamp: datetime = field(default_factory=datetime.now)
 
 
@@ -41,8 +40,8 @@ class MetricsCollector:
     def __init__(self):
         self.llm_calls: list[LLMCallMetrics] = []
         self.tool_calls: list[ToolCallMetrics] = []
-        self.start_time: Optional[float] = None
-        self.end_time: Optional[float] = None
+        self.start_time: float | None = None
+        self.end_time: float | None = None
 
     def start_run(self):
         """Mark the start of an analysis run."""
@@ -88,7 +87,7 @@ class MetricsCollector:
         tool_name: str,
         success: bool,
         latency_ms: float,
-        error: Optional[str] = None,
+        error: str | None = None,
     ):
         """Log a tool call.
 
@@ -156,7 +155,7 @@ class MetricsCollector:
         Returns:
             Dict mapping agent name to metrics summary
         """
-        agents = set(c.agent for c in self.llm_calls)
+        agents = {c.agent for c in self.llm_calls}
         agents.update(c.agent for c in self.tool_calls)
 
         result = {}
@@ -211,7 +210,7 @@ class MetricsCollector:
 
 
 # Global metrics collector (singleton pattern)
-_metrics: Optional[MetricsCollector] = None
+_metrics: MetricsCollector | None = None
 
 
 def get_metrics() -> MetricsCollector:

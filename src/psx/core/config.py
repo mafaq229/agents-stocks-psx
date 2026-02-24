@@ -5,7 +5,8 @@ Loads settings from environment variables and provides typed access.
 
 import os
 from dataclasses import dataclass, field
-from typing import Optional, Literal
+from typing import Literal
+
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -16,8 +17,8 @@ LLMProvider = Literal["openai", "anthropic"]
 # Default models per provider
 DEFAULT_MODELS = {
     "openai": {
-        "smart": "gpt-5.1",       # For complex analysis (AnalystAgent, Synthesis)
-        "fast": "gpt-5-nano",   # For routing/summarization (Data, Supervisor, PDF summarizer)
+        "smart": "gpt-5.1",  # For complex analysis (AnalystAgent, Synthesis)
+        "fast": "gpt-5-nano",  # For routing/summarization (Data, Supervisor, PDF summarizer)
     },
     "anthropic": {
         "smart": "claude-sonnet-4-5-20250929",
@@ -43,14 +44,14 @@ class AgentModels:
     """Per-agent model configuration."""
 
     # Agents that need smarter models (complex reasoning)
-    analyst: Optional[str] = None      # Financial analysis - use smart
-    synthesis: Optional[str] = None    # Final report generation - use smart
+    analyst: str | None = None  # Financial analysis - use smart
+    synthesis: str | None = None  # Final report generation - use smart
 
     # Agents that can use cheaper models (tool calling, routing)
-    supervisor: Optional[str] = None   # Routing decisions - use fast
-    data: Optional[str] = None         # Tool calls only - use fast
-    research: Optional[str] = None     # Tool calls + some reasoning - use fast
-    pdf_summarizer: Optional[str] = None  # PDF extraction - use fast
+    supervisor: str | None = None  # Routing decisions - use fast
+    data: str | None = None  # Tool calls only - use fast
+    research: str | None = None  # Tool calls + some reasoning - use fast
+    pdf_summarizer: str | None = None  # PDF extraction - use fast
 
 
 @dataclass
@@ -58,9 +59,9 @@ class Config:
     """Application configuration loaded from environment variables."""
 
     # API Keys
-    openai_api_key: Optional[str] = None
-    anthropic_api_key: Optional[str] = None
-    tavily_api_key: Optional[str] = None
+    openai_api_key: str | None = None
+    anthropic_api_key: str | None = None
+    tavily_api_key: str | None = None
 
     # LLM Settings
     llm: LLMConfig = field(default_factory=LLMConfig)
@@ -135,7 +136,7 @@ class Config:
             agent_timeout=float(os.getenv("PSX_AGENT_TIMEOUT", "300.0")),
         )
 
-    def get_api_key(self, provider: Optional[LLMProvider] = None) -> str:
+    def get_api_key(self, provider: LLMProvider | None = None) -> str:
         """Get API key for the specified or default provider."""
         provider = provider or self.llm.provider
 
@@ -163,7 +164,7 @@ class Config:
         # Check for explicit override first
         override = getattr(self.agent_models, agent_type, None)
         if override:
-            return override
+            return str(override)
 
         # Use smart model for complex reasoning tasks
         smart_agents = {"analyst", "synthesis"}
@@ -191,7 +192,7 @@ class Config:
 
 
 # Global config instance - lazy loaded
-_config: Optional[Config] = None
+_config: Config | None = None
 
 
 def get_config() -> Config:

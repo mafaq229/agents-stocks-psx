@@ -1,13 +1,13 @@
 """Observability module for metrics and cost tracking."""
 
+from psx.observability.cost import calculate_cost, calculate_total_cost
 from psx.observability.metrics import (
-    MetricsCollector,
     LLMCallMetrics,
+    MetricsCollector,
     ToolCallMetrics,
     get_metrics,
     reset_metrics,
 )
-from psx.observability.cost import calculate_cost, calculate_total_cost
 
 __all__ = [
     "MetricsCollector",

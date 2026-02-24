@@ -1,11 +1,12 @@
 """Tests for web search tool."""
 
+from unittest.mock import MagicMock, patch
+
 import pytest
-from unittest.mock import patch, MagicMock
 
 from psx.tools.web_search import (
-    SearchResult,
     SearchResponse,
+    SearchResult,
     TavilySearch,
     format_search_for_llm,
 )
@@ -169,7 +170,7 @@ class TestTavilySearch:
             search = TavilySearch()
             search._client = mock_client
 
-            response = search.search_news("OGDC stock")
+            search.search_news("OGDC stock")
 
             # Verify search was called with news-specific query
             call_args = mock_client.search.call_args

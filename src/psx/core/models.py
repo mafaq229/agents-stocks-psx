@@ -3,30 +3,30 @@
 Uses dataclasses for type safety and easy serialization.
 """
 
-from dataclasses import dataclass, field, asdict
+from dataclasses import asdict, dataclass, field
 from datetime import datetime
-from typing import Optional, List, Dict, Any
+from typing import Any
 
 
 @dataclass
 class QuoteData:
     """Real-time market quote data."""
 
-    price: Optional[float] = None
-    change: Optional[float] = None
-    change_pct: Optional[float] = None
-    volume: Optional[int] = None
-    open: Optional[float] = None
-    high: Optional[float] = None
-    low: Optional[float] = None
-    ldcp: Optional[float] = None  # Last Day Close Price
-    week_52_high: Optional[float] = None
-    week_52_low: Optional[float] = None
-    pe_ratio: Optional[float] = None
-    ytd_change_pct: Optional[float] = None
-    year_change_pct: Optional[float] = None
+    price: float | None = None
+    change: float | None = None
+    change_pct: float | None = None
+    volume: int | None = None
+    open: float | None = None
+    high: float | None = None
+    low: float | None = None
+    ldcp: float | None = None  # Last Day Close Price
+    week_52_high: float | None = None
+    week_52_low: float | None = None
+    pe_ratio: float | None = None
+    ytd_change_pct: float | None = None
+    year_change_pct: float | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {k: v for k, v in asdict(self).items() if v is not None}
 
 
@@ -35,19 +35,19 @@ class CompanyData:
     """Company profile and reference data."""
 
     symbol: str
-    name: Optional[str] = None
-    sector: Optional[str] = None
-    description: Optional[str] = None
-    ceo: Optional[str] = None
-    chairperson: Optional[str] = None
-    company_secretary: Optional[str] = None
-    auditor: Optional[str] = None
-    registrar: Optional[str] = None
-    fiscal_year_end: Optional[str] = None
-    website: Optional[str] = None
-    address: Optional[str] = None
+    name: str | None = None
+    sector: str | None = None
+    description: str | None = None
+    ceo: str | None = None
+    chairperson: str | None = None
+    company_secretary: str | None = None
+    auditor: str | None = None
+    registrar: str | None = None
+    fiscal_year_end: str | None = None
+    website: str | None = None
+    address: str | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {k: v for k, v in asdict(self).items() if v is not None}
 
 
@@ -55,12 +55,12 @@ class CompanyData:
 class EquityData:
     """Equity/shareholding data."""
 
-    market_cap: Optional[float] = None
-    shares_outstanding: Optional[int] = None
-    free_float_shares: Optional[int] = None
-    free_float_pct: Optional[float] = None
+    market_cap: float | None = None
+    shares_outstanding: int | None = None
+    free_float_shares: int | None = None
+    free_float_pct: float | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {k: v for k, v in asdict(self).items() if v is not None}
 
 
@@ -71,10 +71,10 @@ class FinancialRow:
     period: str  # "2025", "Q1 2026"
     period_type: str  # "annual", "quarterly"
     metric: str  # "Profit after Taxation", "EPS"
-    value: Optional[float] = None
-    raw_value: Optional[str] = None  # Original string
+    value: float | None = None
+    raw_value: str | None = None  # Original string
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
 
@@ -84,10 +84,10 @@ class RatioRow:
 
     period: str
     metric: str  # "Net Profit Margin", "EPS Growth"
-    value: Optional[float] = None
-    raw_value: Optional[str] = None
+    value: float | None = None
+    raw_value: str | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
 
@@ -97,10 +97,10 @@ class AnnouncementData:
 
     date: str  # ISO format: "2025-11-10"
     title: str
-    category: Optional[str] = None  # "financial_results", "board_meetings", "others"
-    url: Optional[str] = None
+    category: str | None = None  # "financial_results", "board_meetings", "others"
+    url: str | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
 
@@ -111,12 +111,12 @@ class ReportData:
     report_type: str  # "annual", "quarterly"
     period: str  # "2025", "2025-09-30"
     url: str
-    local_path: Optional[str] = None
-    text_path: Optional[str] = None
+    local_path: str | None = None
+    text_path: str | None = None
     is_downloaded: bool = False
     is_parsed: bool = False
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
 
@@ -124,15 +124,15 @@ class ReportData:
 class DividendData:
     """Dividend/payout information."""
 
-    announcement_date: Optional[str] = None
-    ex_date: Optional[str] = None
-    record_date: Optional[str] = None
-    payment_date: Optional[str] = None
-    dividend_type: Optional[str] = None  # "cash", "stock", "bonus"
-    amount: Optional[float] = None
-    percentage: Optional[float] = None
+    announcement_date: str | None = None
+    ex_date: str | None = None
+    record_date: str | None = None
+    payment_date: str | None = None
+    dividend_type: str | None = None  # "cash", "stock", "bonus"
+    amount: float | None = None
+    percentage: float | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {k: v for k, v in asdict(self).items() if v is not None}
 
 
@@ -142,19 +142,19 @@ class ScrapedData:
 
     symbol: str
     scraped_at: str = field(default_factory=lambda: datetime.utcnow().isoformat() + "Z")
-    source_url: Optional[str] = None
+    source_url: str | None = None
 
-    quote: Optional[QuoteData] = None
-    company: Optional[CompanyData] = None
-    equity: Optional[EquityData] = None
-    financials: Dict[str, List[FinancialRow]] = field(default_factory=dict)  # annual, quarterly
-    ratios: List[RatioRow] = field(default_factory=list)
-    announcements: Dict[str, List[AnnouncementData]] = field(default_factory=dict)
-    reports: List[ReportData] = field(default_factory=list)
-    dividends: List[DividendData] = field(default_factory=list)
-    risk_flags: Dict[str, Any] = field(default_factory=dict)
+    quote: QuoteData | None = None
+    company: CompanyData | None = None
+    equity: EquityData | None = None
+    financials: dict[str, list[FinancialRow]] = field(default_factory=dict)  # annual, quarterly
+    ratios: list[RatioRow] = field(default_factory=list)
+    announcements: dict[str, list[AnnouncementData]] = field(default_factory=dict)
+    reports: list[ReportData] = field(default_factory=list)
+    dividends: list[DividendData] = field(default_factory=list)
+    risk_flags: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
         result = {
             "_meta": {
@@ -165,9 +165,7 @@ class ScrapedData:
             "quote": self.quote.to_dict() if self.quote else {},
             "company": self.company.to_dict() if self.company else {},
             "equity": self.equity.to_dict() if self.equity else {},
-            "financials": {
-                k: [row.to_dict() for row in v] for k, v in self.financials.items()
-            },
+            "financials": {k: [row.to_dict() for row in v] for k, v in self.financials.items()},
             "ratios": [row.to_dict() for row in self.ratios],
             "announcements": {
                 k: [ann.to_dict() for ann in v] for k, v in self.announcements.items()

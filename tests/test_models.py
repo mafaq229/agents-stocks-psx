@@ -1,17 +1,16 @@
 """Tests for core data models."""
 
-import pytest
 from datetime import datetime
 
 from psx.core.models import (
-    QuoteData,
+    AnnouncementData,
     CompanyData,
+    DividendData,
     EquityData,
     FinancialRow,
+    QuoteData,
     RatioRow,
-    AnnouncementData,
     ReportData,
-    DividendData,
     ScrapedData,
 )
 
@@ -296,13 +295,19 @@ class TestScrapedData:
             company=CompanyData(symbol="TEST", name="Test Company"),
             equity=EquityData(market_cap=1000000.0),
             financials={
-                "annual": [FinancialRow(period="2025", period_type="annual", metric="Revenue", value=1000.0)]
+                "annual": [
+                    FinancialRow(
+                        period="2025", period_type="annual", metric="Revenue", value=1000.0
+                    )
+                ]
             },
             ratios=[RatioRow(period="2025", metric="PE", value=15.0)],
-            announcements={
-                "others": [AnnouncementData(date="2025-01-15", title="Test")]
-            },
-            reports=[ReportData(report_type="annual", period="2025", url="https://example.com/report.pdf")],
+            announcements={"others": [AnnouncementData(date="2025-01-15", title="Test")]},
+            reports=[
+                ReportData(
+                    report_type="annual", period="2025", url="https://example.com/report.pdf"
+                )
+            ],
             dividends=[DividendData(amount=5.0)],
             risk_flags={"high_debt": True},
         )
@@ -347,11 +352,17 @@ class TestScrapedData:
             symbol="TEST",
             financials={
                 "annual": [
-                    FinancialRow(period="2025", period_type="annual", metric="Revenue", value=1000.0),
-                    FinancialRow(period="2024", period_type="annual", metric="Revenue", value=900.0),
+                    FinancialRow(
+                        period="2025", period_type="annual", metric="Revenue", value=1000.0
+                    ),
+                    FinancialRow(
+                        period="2024", period_type="annual", metric="Revenue", value=900.0
+                    ),
                 ],
                 "quarterly": [
-                    FinancialRow(period="Q1 2025", period_type="quarterly", metric="Revenue", value=250.0),
+                    FinancialRow(
+                        period="Q1 2025", period_type="quarterly", metric="Revenue", value=250.0
+                    ),
                 ],
             },
         )
@@ -369,10 +380,14 @@ class TestScrapedData:
             symbol="TEST",
             announcements={
                 "board_meetings": [
-                    AnnouncementData(date="2025-01-15", title="Board Meeting", category="board_meetings"),
+                    AnnouncementData(
+                        date="2025-01-15", title="Board Meeting", category="board_meetings"
+                    ),
                 ],
                 "financial_results": [
-                    AnnouncementData(date="2025-01-20", title="Q4 Results", category="financial_results"),
+                    AnnouncementData(
+                        date="2025-01-20", title="Q4 Results", category="financial_results"
+                    ),
                 ],
             },
         )

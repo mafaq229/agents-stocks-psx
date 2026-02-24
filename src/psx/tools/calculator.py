@@ -5,7 +5,6 @@ Provides valuation methods (DCF, Graham, P/E) and ratio calculations.
 
 import math
 from dataclasses import dataclass
-from typing import Optional
 
 
 @dataclass
@@ -15,7 +14,7 @@ class ValuationResult:
     method: str
     value: float
     inputs: dict
-    notes: Optional[str] = None
+    notes: str | None = None
 
 
 class ValuationCalculator:
@@ -114,7 +113,7 @@ class ValuationCalculator:
         free_cash_flows: list[float],
         discount_rate: float = 0.10,
         terminal_growth_rate: float = 0.03,
-        shares_outstanding: Optional[int] = None,
+        shares_outstanding: int | None = None,
     ) -> ValuationResult:
         """Calculate intrinsic value using Discounted Cash Flow model.
 
@@ -231,7 +230,7 @@ class ValuationCalculator:
     @staticmethod
     def composite_valuation(
         valuations: list[ValuationResult],
-        weights: Optional[list[float]] = None,
+        weights: list[float] | None = None,
     ) -> dict:
         """Calculate weighted average of multiple valuation methods.
 
@@ -259,14 +258,14 @@ class ValuationCalculator:
             total = sum(weights)
             weights = [w / total for w in weights]
 
-        composite = sum(v.value * w for v, w in zip(valid_valuations, weights))
+        composite = sum(v.value * w for v, w in zip(valid_valuations, weights, strict=False))
 
         return {
             "composite_value": round(composite, 2),
             "methods_used": len(valid_valuations),
             "breakdown": [
                 {"method": v.method, "value": v.value, "weight": w}
-                for v, w in zip(valid_valuations, weights)
+                for v, w in zip(valid_valuations, weights, strict=False)
             ],
         }
 
@@ -283,9 +282,7 @@ class RatioCalculator:
         return round(current_assets / current_liabilities, 2)
 
     @staticmethod
-    def quick_ratio(
-        current_assets: float, inventory: float, current_liabilities: float
-    ) -> float:
+    def quick_ratio(current_assets: float, inventory: float, current_liabilities: float) -> float:
         """(Current Assets - Inventory) / Current Liabilities"""
         if current_liabilities == 0:
             return float("inf")
@@ -395,14 +392,14 @@ class RatioCalculator:
 
 
 def detect_red_flags(
-    current_ratio: Optional[float] = None,
-    quick_ratio: Optional[float] = None,
-    debt_to_equity: Optional[float] = None,
-    interest_coverage: Optional[float] = None,
-    profit_margin: Optional[float] = None,
-    roe: Optional[float] = None,
-    revenue_growth: Optional[float] = None,
-    earnings_growth: Optional[float] = None,
+    current_ratio: float | None = None,
+    quick_ratio: float | None = None,
+    debt_to_equity: float | None = None,
+    interest_coverage: float | None = None,
+    profit_margin: float | None = None,
+    roe: float | None = None,
+    revenue_growth: float | None = None,
+    earnings_growth: float | None = None,
 ) -> list[str]:
     """Detect financial red flags based on key ratios.
 
@@ -444,12 +441,12 @@ def detect_red_flags(
 
 
 def detect_strengths(
-    current_ratio: Optional[float] = None,
-    debt_to_equity: Optional[float] = None,
-    interest_coverage: Optional[float] = None,
-    profit_margin: Optional[float] = None,
-    roe: Optional[float] = None,
-    revenue_growth: Optional[float] = None,
+    current_ratio: float | None = None,
+    debt_to_equity: float | None = None,
+    interest_coverage: float | None = None,
+    profit_margin: float | None = None,
+    roe: float | None = None,
+    revenue_growth: float | None = None,
 ) -> list[str]:
     """Detect financial strengths based on key ratios.
 

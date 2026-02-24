@@ -1,18 +1,16 @@
 """Tests for number parsing utilities."""
 
-import pytest
-
 from psx.utils.parsers import (
-    parse_price,
-    parse_number,
-    parse_negative,
-    parse_percent,
-    parse_date,
     parse_52_week_range,
     parse_change_with_percent,
-    parse_volume,
-    parse_shares,
+    parse_date,
     parse_market_cap,
+    parse_negative,
+    parse_number,
+    parse_percent,
+    parse_price,
+    parse_shares,
+    parse_volume,
 )
 
 

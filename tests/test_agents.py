@@ -1,11 +1,15 @@
 """Tests for agent tool functions."""
 
-import pytest
-from unittest.mock import patch, MagicMock, AsyncMock
-import tempfile
-import os
+from unittest.mock import MagicMock
 
-from psx.tools.calculator import ValuationCalculator, RatioCalculator, detect_red_flags, detect_strengths
+import pytest
+
+from psx.tools.calculator import (
+    RatioCalculator,
+    ValuationCalculator,
+    detect_red_flags,
+    detect_strengths,
+)
 
 
 class TestAnalystAgentTools:
@@ -25,9 +29,7 @@ class TestAnalystAgentTools:
 
     def test_calculate_book_value(self):
         """Test book value calculation."""
-        result = ValuationCalculator.book_value_valuation(
-            book_value_per_share=50.0, pb_ratio=1.2
-        )
+        result = ValuationCalculator.book_value_valuation(book_value_per_share=50.0, pb_ratio=1.2)
         assert result.value == 60.0
 
     def test_calculate_dcf(self):

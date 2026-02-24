@@ -5,7 +5,7 @@ Provides search capabilities for news and general web content.
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any
 
 from psx.core.config import get_config
 
@@ -18,7 +18,7 @@ class SearchResult:
     url: str
     content: str
     score: float = 0.0
-    published_date: Optional[str] = None
+    published_date: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -36,7 +36,7 @@ class SearchResponse:
 
     query: str
     results: list[SearchResult] = field(default_factory=list)
-    answer: Optional[str] = None  # Tavily's AI-generated answer
+    answer: str | None = None  # Tavily's AI-generated answer
     search_time: float = 0.0
 
     def to_dict(self) -> dict[str, Any]:
@@ -52,7 +52,7 @@ class SearchResponse:
 class TavilySearch:
     """Web search using Tavily API."""
 
-    def __init__(self, api_key: Optional[str] = None):
+    def __init__(self, api_key: str | None = None):
         """Initialize Tavily search client.
 
         Args:
@@ -62,9 +62,7 @@ class TavilySearch:
         self.api_key = api_key or config.tavily_api_key
 
         if not self.api_key:
-            raise ValueError(
-                "Tavily API key not set. Set TAVILY_API_KEY environment variable."
-            )
+            raise ValueError("Tavily API key not set. Set TAVILY_API_KEY environment variable.")
 
         self._client: Any = None
 
@@ -73,10 +71,10 @@ class TavilySearch:
         if self._client is None:
             try:
                 from tavily import TavilyClient
-            except ImportError:
+            except ImportError as err:
                 raise ImportError(
                     "Tavily package not installed. Run: uv add tavily-python"
-                )
+                ) from err
             self._client = TavilyClient(api_key=self.api_key)
         return self._client
 
@@ -86,8 +84,8 @@ class TavilySearch:
         max_results: int = 5,
         search_depth: str = "basic",
         include_answer: bool = True,
-        include_domains: Optional[list[str]] = None,
-        exclude_domains: Optional[list[str]] = None,
+        include_domains: list[str] | None = None,
+        exclude_domains: list[str] | None = None,
     ) -> SearchResponse:
         """Perform a web search.
 
@@ -161,16 +159,13 @@ class TavilySearch:
         news_query = f"{query} news latest"
 
         return self.search(
-            query=news_query,
-            max_results=max_results,
-            search_depth="advanced",
-            include_answer=True
+            query=news_query, max_results=max_results, search_depth="advanced", include_answer=True
         )
 
     def search_company_info(
         self,
         company_name: str,
-        symbol: Optional[str] = None,
+        symbol: str | None = None,
         max_results: int = 5,
     ) -> SearchResponse:
         """Search for company information.
@@ -199,7 +194,7 @@ class TavilySearch:
     def search_competitors(
         self,
         company_name: str,
-        sector: Optional[str] = None,
+        sector: str | None = None,
         max_results: int = 5,
     ) -> SearchResponse:
         """Search for competitor information.

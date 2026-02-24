@@ -4,36 +4,33 @@ Uses Playwright for browser automation to scrape dynamic content
 from the Pakistan Stock Exchange website.
 """
 
-import asyncio
 import re
-import time
-from typing import Dict, Any, List, Optional
 from datetime import datetime
 
-from playwright.async_api import async_playwright, Page
+from playwright.async_api import Page, async_playwright
 
+from psx.core.exceptions import ScraperError
 from psx.core.models import (
+    AnnouncementData,
     CompanyData,
-    QuoteData,
     EquityData,
     FinancialRow,
+    QuoteData,
     RatioRow,
-    AnnouncementData,
     ReportData,
     ScrapedData,
 )
-from psx.core.exceptions import ScraperError
-from psx.utils.parsers import (
-    parse_price,
-    parse_number,
-    parse_negative,
-    parse_percent,
-    parse_date,
-    parse_volume,
-    parse_change_with_percent,
-    parse_52_week_range,
-)
 from psx.scraper import selectors
+from psx.utils.parsers import (
+    parse_52_week_range,
+    parse_change_with_percent,
+    parse_date,
+    parse_negative,
+    parse_number,
+    parse_percent,
+    parse_price,
+    parse_volume,
+)
 
 
 class PSXScraper:
@@ -61,7 +58,6 @@ class PSXScraper:
             ScrapedData with all available data
         """
         url = f"{self.BASE_URL}{symbol}"
-        start_time = time.time()
 
         async with async_playwright() as p:
             browser = await p.chromium.launch(headless=self.headless)
@@ -70,9 +66,9 @@ class PSXScraper:
             try:
                 response = await page.goto(url, timeout=60000)
 
-                if response.status != 200:
+                if response is None or response.status != 200:
                     raise ScraperError(
-                        f"Failed to load page. Status: {response.status}",
+                        f"Failed to load page. Status: {response.status if response else 'None'}",
                         symbol=symbol,
                         url=url,
                     )
@@ -103,7 +99,7 @@ class PSXScraper:
                 )
 
             except Exception as e:
-                raise ScraperError(str(e), symbol=symbol, url=url)
+                raise ScraperError(str(e), symbol=symbol, url=url) from e
 
             finally:
                 await browser.close()
@@ -124,49 +120,57 @@ class PSXScraper:
             # Volume
             volume = None
             try:
-                vol_el = page.locator(selectors.STATS_ITEM).filter(
-                    has_text=re.compile("Volume", re.IGNORECASE)
-                ).locator(selectors.STATS_VALUE)
+                vol_el = (
+                    page.locator(selectors.STATS_ITEM)
+                    .filter(has_text=re.compile("Volume", re.IGNORECASE))
+                    .locator(selectors.STATS_VALUE)
+                )
                 if await vol_el.count() > 0:
                     volume_text = await vol_el.first.inner_text()
                     volume = parse_volume(volume_text)
-            except:
+            except Exception:
                 pass
 
             # P/E Ratio
             pe_ratio = None
             try:
-                pe_el = page.locator(selectors.STATS_ITEM).filter(
-                    has_text=re.compile("P/E", re.IGNORECASE)
-                ).locator(selectors.STATS_VALUE)
+                pe_el = (
+                    page.locator(selectors.STATS_ITEM)
+                    .filter(has_text=re.compile("P/E", re.IGNORECASE))
+                    .locator(selectors.STATS_VALUE)
+                )
                 if await pe_el.count() > 0:
                     pe_text = await pe_el.first.inner_text()
                     pe_ratio = parse_number(pe_text)
-            except:
+            except Exception:
                 pass
 
             # 52-week range
             week_52_low, week_52_high = None, None
             try:
-                range_el = page.locator(selectors.STATS_ITEM).filter(
-                    has_text=re.compile("52.*Week", re.IGNORECASE)
-                ).locator(selectors.STATS_VALUE)
+                range_el = (
+                    page.locator(selectors.STATS_ITEM)
+                    .filter(has_text=re.compile("52.*Week", re.IGNORECASE))
+                    .locator(selectors.STATS_VALUE)
+                )
                 if await range_el.count() > 0:
                     range_text = await range_el.first.inner_text()
                     week_52_low, week_52_high = parse_52_week_range(range_text)
-            except:
+            except Exception:
                 pass
 
             # YTD Change
             ytd_change_pct = None
             try:
-                ytd_el = page.locator(selectors.STATS_ITEM).filter(
-                    has_text=re.compile("YTD", re.IGNORECASE)
-                ).locator(selectors.STATS_VALUE)
+                ytd_el = (
+                    page.locator(selectors.STATS_ITEM)
+                    .filter(has_text=re.compile("YTD", re.IGNORECASE))
+                    .locator(selectors.STATS_VALUE)
+                )
                 if await ytd_el.count() > 0:
                     ytd_text = await ytd_el.first.inner_text()
                     ytd_change_pct = parse_percent(ytd_text)
-            except:
+            except Exception:
                 pass
 
             return QuoteData(
@@ -205,7 +209,7 @@ class PSXScraper:
                 if await name_el.count() > 0:
                     name = await name_el.inner_text()
                     name = name.strip()
-            except:
+            except Exception:
                 pass
 
             # Sector from .quote__sector
@@ -218,7 +222,7 @@ class PSXScraper:
                 # Filter out false positives
                 if sector and sector.lower() in ["stock screener", "screener", ""]:
                     sector = None
-            except:
+            except Exception:
                 pass
 
             # Description from profile section
@@ -227,7 +231,7 @@ class PSXScraper:
                 if await desc_el.count() > 0:
                     description = await desc_el.inner_text()
                     description = description.strip()
-            except:
+            except Exception:
                 pass
 
             # KEY PEOPLE from table in .profile__item--people
@@ -254,15 +258,16 @@ class PSXScraper:
 
                 for item in profile_items:
                     heads = await item.locator(selectors.PROFILE_ITEM_HEAD).all()
-                    values = await item.locator("p").all()
 
                     # Match heads with following p elements
-                    for i, head in enumerate(heads):
+                    for _, head in enumerate(heads):
                         head_text = (await head.inner_text()).strip().lower()
 
                         # Find the next p element after this head
                         # The value p comes right after the head div
-                        value_p = item.locator(f"{selectors.PROFILE_ITEM_HEAD}:has-text('{(await head.inner_text()).strip()}') + p")
+                        value_p = item.locator(
+                            f"{selectors.PROFILE_ITEM_HEAD}:has-text('{(await head.inner_text()).strip()}') + p"
+                        )
                         if await value_p.count() == 0:
                             continue
 
@@ -327,7 +332,7 @@ class PSXScraper:
             print(f"Error scraping equity: {e}")
             return EquityData()
 
-    async def _scrape_financials(self, page: Page) -> Dict[str, List[FinancialRow]]:
+    async def _scrape_financials(self, page: Page) -> dict[str, list[FinancialRow]]:
         """Scrape financial statements (annual and quarterly)."""
         financials = {}
 
@@ -351,13 +356,15 @@ class PSXScraper:
 
                 quarterly_rows = await self._scrape_table(page, selectors.QUARTERLY_PANEL)
                 if quarterly_rows:
-                    financials["quarterly"] = self._parse_financial_rows(quarterly_rows, "quarterly")
+                    financials["quarterly"] = self._parse_financial_rows(
+                        quarterly_rows, "quarterly"
+                    )
         except Exception as e:
             print(f"Error scraping quarterly financials: {e}")
 
         return financials
 
-    async def _scrape_ratios(self, page: Page) -> List[RatioRow]:
+    async def _scrape_ratios(self, page: Page) -> list[RatioRow]:
         """Scrape financial ratios."""
         try:
             ratio_tab = page.locator(selectors.RATIOS_TAB)
@@ -372,7 +379,7 @@ class PSXScraper:
             print(f"Error scraping ratios: {e}")
             return []
 
-    async def _scrape_announcements(self, page: Page) -> Dict[str, List[AnnouncementData]]:
+    async def _scrape_announcements(self, page: Page) -> dict[str, list[AnnouncementData]]:
         """Scrape company announcements."""
         announcements = {}
 
@@ -411,7 +418,7 @@ class PSXScraper:
 
         return announcements
 
-    async def _scrape_reports(self, page: Page) -> List[ReportData]:
+    async def _scrape_reports(self, page: Page) -> list[ReportData]:
         """Scrape financial reports (PDFs)."""
         try:
             rep_tab = page.locator(selectors.REPORTS_TAB)
@@ -438,7 +445,7 @@ class PSXScraper:
             print(f"Error scraping reports: {e}")
             return []
 
-    async def _scrape_table(self, page: Page, selector: str) -> List[Dict[str, str]]:
+    async def _scrape_table(self, page: Page, selector: str) -> list[dict[str, str]]:
         """Generic table scraper."""
         data = []
         try:
@@ -463,16 +470,16 @@ class PSXScraper:
                 row_vals = [await cell.inner_text() for cell in cells]
 
                 if len(row_vals) == len(headers):
-                    data.append(dict(zip(headers, row_vals)))
+                    data.append(dict(zip(headers, row_vals, strict=False)))
 
-        except Exception as e:
+        except Exception:
             pass
 
         return data
 
     async def _scrape_announcement_table(
-        self, page: Page, selector: str = None
-    ) -> List[Dict[str, str]]:
+        self, page: Page, selector: str | None = None
+    ) -> list[dict[str, str]]:
         """Scrape announcement/report tables."""
         data = []
         try:
@@ -502,11 +509,13 @@ class PSXScraper:
                     if link and not link.startswith("http"):
                         link = "https://dps.psx.com.pk" + link
 
-                    data.append({
-                        "date": date.strip(),
-                        "title": title.strip(),
-                        "url": link,
-                    })
+                    data.append(
+                        {
+                            "date": date.strip(),
+                            "title": title.strip(),
+                            "url": link or "",
+                        }
+                    )
 
         except Exception as e:
             print(f"Error scraping announcement table: {e}")
@@ -514,8 +523,8 @@ class PSXScraper:
         return data
 
     def _parse_financial_rows(
-        self, table_data: List[Dict[str, str]], period_type: str
-    ) -> List[FinancialRow]:
+        self, table_data: list[dict[str, str]], period_type: str
+    ) -> list[FinancialRow]:
         """Convert table data to FinancialRow objects."""
         rows = []
 
@@ -540,7 +549,7 @@ class PSXScraper:
 
         return rows
 
-    def _parse_ratio_rows(self, table_data: List[Dict[str, str]]) -> List[RatioRow]:
+    def _parse_ratio_rows(self, table_data: list[dict[str, str]]) -> list[RatioRow]:
         """Convert table data to RatioRow objects."""
         rows = []
 
@@ -565,7 +574,7 @@ class PSXScraper:
         return rows
 
 
-async def scrape_companies(symbols: List[str], headless: bool = True) -> Dict[str, ScrapedData]:
+async def scrape_companies(symbols: list[str], headless: bool = True) -> dict[str, ScrapedData]:
     """
     Scrape multiple companies.
 

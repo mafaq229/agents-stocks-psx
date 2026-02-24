@@ -7,22 +7,22 @@ import asyncio
 import json
 import logging
 import re
-from typing import Any, Optional
+from typing import Any
 
-from psx.agents.base import BaseAgent, AgentConfig
+from psx.agents.base import AgentConfig, BaseAgent
 from psx.agents.llm import Tool
 from psx.agents.schemas import DataAgentOutput
-from psx.core.models import ScrapedData
 from psx.core.config import get_config
+from psx.core.models import ScrapedData
 from psx.core.prompts import get_prompt_registry
-from psx.storage.data_store import DataStore
 from psx.scraper.psx_scraper import PSXScraper
-
+from psx.storage.data_store import DataStore
 
 logger = logging.getLogger(__name__)
 
 
 # ========== HELPER FUNCTIONS ==========
+
 
 def _get_data_store() -> DataStore:
     """Get or create DataStore instance."""
@@ -106,7 +106,7 @@ def _build_company_response(symbol: str, store: DataStore) -> dict[str, Any]:
     return result
 
 
-def _get_market_cap(symbol: str, store: DataStore) -> Optional[float]:
+def _get_market_cap(symbol: str, store: DataStore) -> float | None:
     """Get market cap for a symbol from quotes table."""
     try:
         cursor = store.db.execute(
@@ -124,7 +124,7 @@ def _get_market_cap(symbol: str, store: DataStore) -> Optional[float]:
         return None
 
 
-def _get_latest_eps(symbol: str, store: DataStore) -> Optional[float]:
+def _get_latest_eps(symbol: str, store: DataStore) -> float | None:
     """Get latest EPS from financials table."""
     try:
         financials = store.get_financials(symbol, period_type="annual", metrics=["EPS"])
@@ -142,13 +142,12 @@ def _get_web_search_client():
     config = get_config()
     if config.tavily_api_key:
         from psx.tools.web_search import TavilySearch
+
         return TavilySearch(api_key=config.tavily_api_key)
     return None
 
 
-def _discover_peers_from_web(
-    company_name: str, sector: Optional[str] = None
-) -> list[str]:
+def _discover_peers_from_web(company_name: str, sector: str | None = None) -> list[str]:
     """Discover peer symbols via web search.
 
     Args:
@@ -168,17 +167,61 @@ def _discover_peers_from_web(
 
         # Extract potential stock symbols from results
         # PSX symbols are typically 3-6 uppercase letters
-        symbol_pattern = r'\b([A-Z]{3,6})\b'
+        symbol_pattern = r"\b([A-Z]{3,6})\b"
         found_symbols = set()
 
         # Common words to exclude (not stock symbols)
         exclude_words = {
-            "PSX", "KSE", "THE", "AND", "FOR", "CEO", "CFO", "LTD", "PVT",
-            "INC", "LLP", "PKR", "USD", "EPS", "ROE", "ROI", "ETF", "IPO",
-            "AGM", "EGM", "BOD", "PDF", "URL", "WWW", "COM",
-            "NET", "ORG", "GOV", "EDU", "PAK", "PER", "YOY", "QOQ", "FY",
-            "HY", "QTR", "MOM", "DAD", "JAN", "FEB", "MAR", "APR", "MAY",
-            "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC",
+            "PSX",
+            "KSE",
+            "THE",
+            "AND",
+            "FOR",
+            "CEO",
+            "CFO",
+            "LTD",
+            "PVT",
+            "INC",
+            "LLP",
+            "PKR",
+            "USD",
+            "EPS",
+            "ROE",
+            "ROI",
+            "ETF",
+            "IPO",
+            "AGM",
+            "EGM",
+            "BOD",
+            "PDF",
+            "URL",
+            "WWW",
+            "COM",
+            "NET",
+            "ORG",
+            "GOV",
+            "EDU",
+            "PAK",
+            "PER",
+            "YOY",
+            "QOQ",
+            "FY",
+            "HY",
+            "QTR",
+            "MOM",
+            "DAD",
+            "JAN",
+            "FEB",
+            "MAR",
+            "APR",
+            "MAY",
+            "JUN",
+            "JUL",
+            "AUG",
+            "SEP",
+            "OCT",
+            "NOV",
+            "DEC",
         }
 
         # Search in answer
@@ -206,6 +249,7 @@ def _discover_peers_from_web(
 
 
 # ========== TOOL IMPLEMENTATIONS ==========
+
 
 def get_company_data(symbol: str) -> dict[str, Any]:
     """Get company data from database. Auto-scrapes if not found.
@@ -324,7 +368,9 @@ def get_sector_peers(
                     peer_data_list.append(peer_info)
                     logger.debug(f"Fetched peer data for {peer_symbol}")
                 else:
-                    logger.warning(f"Failed to get peer data for {peer_symbol}: {peer_info.get('error')}")
+                    logger.warning(
+                        f"Failed to get peer data for {peer_symbol}: {peer_info.get('error')}"
+                    )
             except Exception as e:
                 logger.warning(f"Error fetching peer data for {peer_symbol}: {e}")
 
@@ -381,13 +427,15 @@ def get_peer_data(symbol: str) -> dict[str, Any]:
     }
 
     if quote:
-        result.update({
-            "price": quote.price,
-            "change_pct": quote.change_pct,
-            "pe_ratio": quote.pe_ratio,
-            "week_52_high": quote.week_52_high,
-            "week_52_low": quote.week_52_low,
-        })
+        result.update(
+            {
+                "price": quote.price,
+                "change_pct": quote.change_pct,
+                "pe_ratio": quote.pe_ratio,
+                "week_52_high": quote.week_52_high,
+                "week_52_low": quote.week_52_low,
+            }
+        )
 
     # Get market cap
     market_cap = _get_market_cap(symbol, store)
@@ -489,7 +537,7 @@ class DataAgent(BaseAgent):
         )
         super().__init__(config=config, tools=DATA_AGENT_TOOLS, **kwargs)
 
-    def run(self, task: str, context: Optional[dict[str, Any]] = None) -> DataAgentOutput:
+    def run(self, task: str, context: dict[str, Any] | None = None) -> DataAgentOutput:
         """Run the data agent and return structured output.
 
         Args:
@@ -538,12 +586,12 @@ class DataAgent(BaseAgent):
     def _parse_to_output(self, result: dict[str, Any]) -> DataAgentOutput:
         """Convert agent result to DataAgentOutput."""
         from psx.core.models import (
-            QuoteData,
+            AnnouncementData,
             CompanyData,
             FinancialRow,
+            QuoteData,
             RatioRow,
             ReportData,
-            AnnouncementData,
         )
 
         # Handle nested output
@@ -552,8 +600,9 @@ class DataAgent(BaseAgent):
             try:
                 if isinstance(result["output"], str):
                     import re
+
                     # Find JSON in output
-                    json_match = re.search(r'\{[\s\S]*\}', result["output"])
+                    json_match = re.search(r"\{[\s\S]*\}", result["output"])
                     if json_match:
                         parsed = json.loads(json_match.group())
                         # Only use parsed result if it's a dict
@@ -611,41 +660,49 @@ class DataAgent(BaseAgent):
                 # Cache format: {"annual": [...], "quarterly": [...]}
                 for period_type, items in fin_data.items():
                     for f in items:
-                        financials.append(FinancialRow(
-                            period=f.get("period", ""),
-                            period_type=period_type,
-                            metric=f.get("metric", ""),
-                            value=f.get("value"),
-                        ))
+                        financials.append(
+                            FinancialRow(
+                                period=f.get("period", ""),
+                                period_type=period_type,
+                                metric=f.get("metric", ""),
+                                value=f.get("value"),
+                            )
+                        )
             else:
                 # Database format: flat list
                 for f in fin_data:
-                    financials.append(FinancialRow(
-                        period=f.get("period", ""),
-                        period_type=f.get("period_type", "annual"),
-                        metric=f.get("metric", ""),
-                        value=f.get("value"),
-                    ))
+                    financials.append(
+                        FinancialRow(
+                            period=f.get("period", ""),
+                            period_type=f.get("period_type", "annual"),
+                            metric=f.get("metric", ""),
+                            value=f.get("value"),
+                        )
+                    )
 
         # Parse ratios
         ratios = []
         if "ratios" in result:
             for r in result.get("ratios", []):
-                ratios.append(RatioRow(
-                    period=r.get("period", ""),
-                    metric=r.get("metric", ""),
-                    value=r.get("value"),
-                ))
+                ratios.append(
+                    RatioRow(
+                        period=r.get("period", ""),
+                        metric=r.get("metric", ""),
+                        value=r.get("value"),
+                    )
+                )
 
         # Parse reports
         reports = []
         if "reports" in result:
             for r in result.get("reports", []):
-                reports.append(ReportData(
-                    report_type=r.get("report_type", ""),
-                    period=r.get("period", ""),
-                    url=r.get("url", ""),
-                ))
+                reports.append(
+                    ReportData(
+                        report_type=r.get("report_type", ""),
+                        period=r.get("period", ""),
+                        url=r.get("url", ""),
+                    )
+                )
 
         # Parse announcements - include URL for PDF parsing
         # Handle both flat list (from DB) and dict by category (from cache)
@@ -656,40 +713,47 @@ class DataAgent(BaseAgent):
                 # Cache format: {"financial_results": [...], "board_meetings": [...], "others": [...]}
                 for category, items in ann_data.items():
                     for a in items:
-                        announcements.append(AnnouncementData(
-                            date=a.get("date", ""),
-                            title=a.get("title", ""),
-                            category=category,
-                            url=a.get("url"),
-                        ))
+                        announcements.append(
+                            AnnouncementData(
+                                date=a.get("date", ""),
+                                title=a.get("title", ""),
+                                category=category,
+                                url=a.get("url"),
+                            )
+                        )
             else:
                 # Database format: flat list
                 for a in ann_data:
-                    announcements.append(AnnouncementData(
-                        date=a.get("date", ""),
-                        title=a.get("title", ""),
-                        category=a.get("category"),
-                        url=a.get("url"),
-                    ))
+                    announcements.append(
+                        AnnouncementData(
+                            date=a.get("date", ""),
+                            title=a.get("title", ""),
+                            category=a.get("category"),
+                            url=a.get("url"),
+                        )
+                    )
 
         # Parse peer_data into PeerDataSnapshot objects
         from psx.agents.schemas import PeerDataSnapshot
+
         peer_data = []
         if "peer_data" in result and result["peer_data"]:
             for p in result["peer_data"]:
-                peer_data.append(PeerDataSnapshot(
-                    symbol=p.get("symbol", ""),
-                    name=p.get("name"),
-                    sector=p.get("sector"),
-                    price=p.get("price"),
-                    change_pct=p.get("change_pct"),
-                    pe_ratio=p.get("pe_ratio"),
-                    market_cap=p.get("market_cap"),
-                    eps=p.get("eps"),
-                    profit_margin=p.get("profit_margin"),
-                    week_52_high=p.get("week_52_high"),
-                    week_52_low=p.get("week_52_low"),
-                ))
+                peer_data.append(
+                    PeerDataSnapshot(
+                        symbol=p.get("symbol", ""),
+                        name=p.get("name"),
+                        sector=p.get("sector"),
+                        price=p.get("price"),
+                        change_pct=p.get("change_pct"),
+                        pe_ratio=p.get("pe_ratio"),
+                        market_cap=p.get("market_cap"),
+                        eps=p.get("eps"),
+                        profit_margin=p.get("profit_margin"),
+                        week_52_high=p.get("week_52_high"),
+                        week_52_low=p.get("week_52_low"),
+                    )
+                )
 
         # Get sector from company if not at top level
         sector = result.get("sector")

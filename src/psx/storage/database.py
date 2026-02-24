@@ -1,9 +1,8 @@
 """SQLite database connection and migration management."""
 
+import logging
 import sqlite3
 from pathlib import Path
-from typing import Optional
-import logging
 
 from psx.core.exceptions import DatabaseError
 
@@ -22,7 +21,7 @@ class Database:
         """
         self.db_path = Path(db_path)
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
-        self._connection: Optional[sqlite3.Connection] = None
+        self._connection: sqlite3.Connection | None = None
 
     # running this function like an attribute (hides complexity of connection). self.connection.execute will run connection first then execute.
     # otherwise we do something like this db.get_connection() i.e. not clean for lazy initalization
@@ -56,7 +55,7 @@ class Database:
             cursor = self.connection.execute(sql, params)
             return cursor
         except sqlite3.Error as e:
-            raise DatabaseError(f"SQL execution failed: {e}")
+            raise DatabaseError(f"SQL execution failed: {e}") from e
 
     def executemany(self, sql: str, params_list: list) -> sqlite3.Cursor:
         """Execute SQL statement with multiple parameter sets."""
@@ -64,7 +63,7 @@ class Database:
             cursor = self.connection.executemany(sql, params_list)
             return cursor
         except sqlite3.Error as e:
-            raise DatabaseError(f"SQL executemany failed: {e}")
+            raise DatabaseError(f"SQL executemany failed: {e}") from e
 
     def commit(self) -> None:
         """Commit current transaction."""
@@ -125,7 +124,7 @@ class Database:
                 logger.info(f"Migration {version} completed")
             except sqlite3.Error as e:
                 self.rollback()
-                raise DatabaseError(f"Migration {version} failed: {e}")
+                raise DatabaseError(f"Migration {version} failed: {e}") from e
 
     def init_database(self, migrations_dir: str = "data/migrations") -> None:
         """
@@ -140,7 +139,7 @@ class Database:
 
 
 # Global database instance (can be overridden)
-_db: Optional[Database] = None
+_db: Database | None = None
 
 
 def get_database(db_path: str = "data/db/psx.db") -> Database:
@@ -151,7 +150,9 @@ def get_database(db_path: str = "data/db/psx.db") -> Database:
     return _db
 
 
-def init_database(db_path: str = "data/db/psx.db", migrations_dir: str = "data/migrations") -> Database:
+def init_database(
+    db_path: str = "data/db/psx.db", migrations_dir: str = "data/migrations"
+) -> Database:
     """Initialize database with migrations and return instance."""
     db = get_database(db_path)
     db.init_database(migrations_dir)

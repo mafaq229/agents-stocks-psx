@@ -1,24 +1,24 @@
 """Tests for DataStore class."""
 
-import pytest
-import tempfile
 import os
-import json
-from pathlib import Path
+import tempfile
 from datetime import date
+from pathlib import Path
 
-from psx.storage.data_store import DataStore
-from psx.storage.database import init_database
+import pytest
+
 from psx.core.models import (
+    AnnouncementData,
     CompanyData,
-    QuoteData,
     EquityData,
     FinancialRow,
+    QuoteData,
     RatioRow,
-    AnnouncementData,
     ReportData,
     ScrapedData,
 )
+from psx.storage.data_store import DataStore
+from psx.storage.database import init_database
 
 
 class TestDataStore:
@@ -39,6 +39,7 @@ class TestDataStore:
 
             # Reset global db state for clean tests
             import psx.storage.database as db_module
+
             db_module._db = None
 
             store = DataStore(
@@ -184,15 +185,9 @@ class TestDataStore:
         company_id = store.save_company(CompanyData(symbol="TEST"))
 
         # Save multiple quotes
-        store.save_quote(
-            company_id, QuoteData(price=10.00), quote_date=date(2025, 1, 1)
-        )
-        store.save_quote(
-            company_id, QuoteData(price=11.00), quote_date=date(2025, 1, 2)
-        )
-        store.save_quote(
-            company_id, QuoteData(price=12.00), quote_date=date(2025, 1, 3)
-        )
+        store.save_quote(company_id, QuoteData(price=10.00), quote_date=date(2025, 1, 1))
+        store.save_quote(company_id, QuoteData(price=11.00), quote_date=date(2025, 1, 2))
+        store.save_quote(company_id, QuoteData(price=12.00), quote_date=date(2025, 1, 3))
 
         latest = store.get_latest_quote("TEST")
         assert latest.price == 12.00
@@ -332,7 +327,7 @@ class TestDataStore:
         company_id = store.save_company(CompanyData(symbol="TEST"))
         for i in range(5):
             ann = AnnouncementData(
-                date=f"2025-01-{i+10}",
+                date=f"2025-01-{i + 10}",
                 title=f"Announcement {i}",
                 category="others",
             )
@@ -367,9 +362,7 @@ class TestDataStore:
                 AnnouncementData(date=d, title=f"Ann {d}"),
             )
 
-        filtered = store.get_announcements(
-            "TEST", start_date="2025-01-10", end_date="2025-01-20"
-        )
+        filtered = store.get_announcements("TEST", start_date="2025-01-10", end_date="2025-01-20")
         assert len(filtered) == 1
         assert filtered[0].date == "2025-01-15"
 
@@ -379,7 +372,7 @@ class TestDataStore:
         for i in range(10):
             store.save_announcement(
                 company_id,
-                AnnouncementData(date=f"2025-01-{i+10}", title=f"Ann {i}"),
+                AnnouncementData(date=f"2025-01-{i + 10}", title=f"Ann {i}"),
             )
 
         limited = store.get_announcements("TEST", limit=5)
@@ -473,7 +466,11 @@ class TestDataStore:
             symbol="TEST",
             quote=QuoteData(price=10.50),
             company=CompanyData(symbol="TEST"),
-            financials={"annual": [FinancialRow(period="2025", period_type="annual", metric="EPS", value=1.5)]},
+            financials={
+                "annual": [
+                    FinancialRow(period="2025", period_type="annual", metric="EPS", value=1.5)
+                ]
+            },
         )
         store.save_cache("TEST", data)
 
@@ -536,8 +533,16 @@ class TestDataStore:
         c1_id = store.save_company(CompanyData(symbol="T1", sector="Energy"))
         c2_id = store.save_company(CompanyData(symbol="T2", sector="Energy"))
 
-        store.save_quote(c1_id, QuoteData(price=50, pe_ratio=10, change_pct=2.0, ytd_change_pct=15.0), EquityData(market_cap=500000))
-        store.save_quote(c2_id, QuoteData(price=100, pe_ratio=20, change_pct=4.0, ytd_change_pct=25.0), EquityData(market_cap=1000000))
+        store.save_quote(
+            c1_id,
+            QuoteData(price=50, pe_ratio=10, change_pct=2.0, ytd_change_pct=15.0),
+            EquityData(market_cap=500000),
+        )
+        store.save_quote(
+            c2_id,
+            QuoteData(price=100, pe_ratio=20, change_pct=4.0, ytd_change_pct=25.0),
+            EquityData(market_cap=1000000),
+        )
 
         averages = store.get_sector_averages("Energy")
 
@@ -566,10 +571,20 @@ class TestDataStore:
             quote=QuoteData(price=10.50, change=0.25, volume=1000000),
             company=CompanyData(symbol="TEST", name="Test Company", sector="Tech"),
             equity=EquityData(market_cap=1000000000),
-            financials={"annual": [FinancialRow(period="2025", period_type="annual", metric="Revenue", value=500000)]},
+            financials={
+                "annual": [
+                    FinancialRow(
+                        period="2025", period_type="annual", metric="Revenue", value=500000
+                    )
+                ]
+            },
             ratios=[RatioRow(period="2025", metric="PE Ratio", value=15.5)],
             announcements={"others": [AnnouncementData(date="2025-01-15", title="Test Ann")]},
-            reports=[ReportData(report_type="annual", period="2025", url="https://example.com/report.pdf")],
+            reports=[
+                ReportData(
+                    report_type="annual", period="2025", url="https://example.com/report.pdf"
+                )
+            ],
         )
 
         company_id = store.save_scraped_data(data)

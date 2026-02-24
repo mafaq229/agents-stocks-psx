@@ -4,11 +4,10 @@ Converts formatted strings from PSX website to machine-readable values.
 """
 
 import re
-from typing import Optional, Tuple
 from datetime import datetime
 
 
-def parse_price(value: str) -> Optional[float]:
+def parse_price(value: str) -> float | None:
     """
     Parse price string to float.
 
@@ -31,7 +30,7 @@ def parse_price(value: str) -> Optional[float]:
         return None
 
 
-def parse_number(value: str) -> Optional[float]:
+def parse_number(value: str) -> float | None:
     """
     Parse formatted number to float.
 
@@ -52,7 +51,7 @@ def parse_number(value: str) -> Optional[float]:
         return None
 
 
-def parse_negative(value: str) -> Optional[float]:
+def parse_negative(value: str) -> float | None:
     """
     Parse accounting-style negative numbers (parentheses = negative).
 
@@ -76,7 +75,7 @@ def parse_negative(value: str) -> Optional[float]:
         return None
 
 
-def parse_percent(value: str) -> Optional[float]:
+def parse_percent(value: str) -> float | None:
     """
     Parse percentage string to float.
 
@@ -101,7 +100,7 @@ def parse_percent(value: str) -> Optional[float]:
         return None
 
 
-def parse_date(value: str) -> Optional[str]:
+def parse_date(value: str) -> str | None:
     """
     Normalize date to ISO format (YYYY-MM-DD).
 
@@ -137,7 +136,7 @@ def parse_date(value: str) -> Optional[str]:
     return cleaned
 
 
-def parse_52_week_range(value: str) -> Tuple[Optional[float], Optional[float]]:
+def parse_52_week_range(value: str) -> tuple[float | None, float | None]:
     """
     Parse 52-week range string.
 
@@ -161,7 +160,7 @@ def parse_52_week_range(value: str) -> Tuple[Optional[float], Optional[float]]:
     return None, None
 
 
-def parse_change_with_percent(value: str) -> Tuple[Optional[float], Optional[float]]:
+def parse_change_with_percent(value: str) -> tuple[float | None, float | None]:
     """
     Parse change string that includes both absolute and percentage.
 
@@ -184,7 +183,7 @@ def parse_change_with_percent(value: str) -> Tuple[Optional[float], Optional[flo
     return None, None
 
 
-def parse_volume(value: str) -> Optional[int]:
+def parse_volume(value: str) -> int | None:
     """
     Parse volume string to integer.
 
@@ -204,7 +203,7 @@ def parse_volume(value: str) -> Optional[int]:
         return None
 
 
-def parse_shares(value: str) -> Optional[int]:
+def parse_shares(value: str) -> int | None:
     """
     Parse shares count to integer.
 
@@ -216,7 +215,7 @@ def parse_shares(value: str) -> Optional[int]:
     return parse_volume(value)
 
 
-def parse_market_cap(value: str) -> Optional[float]:
+def parse_market_cap(value: str) -> float | None:
     """
     Parse market cap to float (keeping in thousands if that's the unit).
 

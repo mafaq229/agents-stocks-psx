@@ -1,12 +1,13 @@
 """Tests for financial calculation tools."""
 
-import pytest
 import math
 
+import pytest
+
 from psx.tools.calculator import (
-    ValuationResult,
-    ValuationCalculator,
     RatioCalculator,
+    ValuationCalculator,
+    ValuationResult,
     detect_red_flags,
     detect_strengths,
 )
@@ -108,9 +109,7 @@ class TestValuationCalculatorBookValue:
 
     def test_with_pb_multiplier(self):
         """Test valuation with P/B multiplier."""
-        result = ValuationCalculator.book_value_valuation(
-            book_value_per_share=50.0, pb_ratio=1.5
-        )
+        result = ValuationCalculator.book_value_valuation(book_value_per_share=50.0, pb_ratio=1.5)
         assert result.value == 75.0
 
     def test_negative_book_value(self):
@@ -175,35 +174,27 @@ class TestValuationCalculatorMarginOfSafety:
 
     def test_undervalued_stock(self):
         """Test margin of safety for undervalued stock."""
-        result = ValuationCalculator.margin_of_safety(
-            intrinsic_value=100.0, current_price=80.0
-        )
+        result = ValuationCalculator.margin_of_safety(intrinsic_value=100.0, current_price=80.0)
         assert result["margin_of_safety_pct"] == 20.0
         assert result["upside_potential_pct"] == 25.0
         assert result["is_undervalued"] is True
 
     def test_overvalued_stock(self):
         """Test margin of safety for overvalued stock."""
-        result = ValuationCalculator.margin_of_safety(
-            intrinsic_value=80.0, current_price=100.0
-        )
+        result = ValuationCalculator.margin_of_safety(intrinsic_value=80.0, current_price=100.0)
         assert result["margin_of_safety_pct"] == -25.0
         assert result["upside_potential_pct"] == -20.0
         assert result["is_undervalued"] is False
 
     def test_fairly_valued(self):
         """Test when price equals intrinsic value."""
-        result = ValuationCalculator.margin_of_safety(
-            intrinsic_value=100.0, current_price=100.0
-        )
+        result = ValuationCalculator.margin_of_safety(intrinsic_value=100.0, current_price=100.0)
         assert result["margin_of_safety_pct"] == 0.0
         assert result["upside_potential_pct"] == 0.0
 
     def test_invalid_intrinsic_value(self):
         """Test with zero or negative intrinsic value."""
-        result = ValuationCalculator.margin_of_safety(
-            intrinsic_value=0, current_price=50.0
-        )
+        result = ValuationCalculator.margin_of_safety(intrinsic_value=0, current_price=50.0)
         assert result["margin_of_safety_pct"] == 0.0
         assert result["is_undervalued"] is False
 
@@ -228,9 +219,7 @@ class TestValuationCalculatorComposite:
             ValuationResult(method="PE", value=100.0, inputs={}),
             ValuationResult(method="Graham", value=200.0, inputs={}),
         ]
-        result = ValuationCalculator.composite_valuation(
-            valuations, weights=[0.75, 0.25]
-        )
+        result = ValuationCalculator.composite_valuation(valuations, weights=[0.75, 0.25])
         assert result["composite_value"] == 125.0  # 100*0.75 + 200*0.25
 
     def test_excludes_zero_values(self):
@@ -259,16 +248,12 @@ class TestRatioCalculatorLiquidity:
 
     def test_current_ratio(self):
         """Test current ratio calculation."""
-        ratio = RatioCalculator.current_ratio(
-            current_assets=200000, current_liabilities=100000
-        )
+        ratio = RatioCalculator.current_ratio(current_assets=200000, current_liabilities=100000)
         assert ratio == 2.0
 
     def test_current_ratio_zero_liabilities(self):
         """Test current ratio with zero liabilities."""
-        ratio = RatioCalculator.current_ratio(
-            current_assets=100000, current_liabilities=0
-        )
+        ratio = RatioCalculator.current_ratio(current_assets=100000, current_liabilities=0)
         assert ratio == float("inf")
 
     def test_quick_ratio(self):
@@ -320,9 +305,7 @@ class TestRatioCalculatorProfitability:
 
     def test_return_on_equity(self):
         """Test ROE calculation."""
-        ratio = RatioCalculator.return_on_equity(
-            net_income=100000, shareholder_equity=500000
-        )
+        ratio = RatioCalculator.return_on_equity(net_income=100000, shareholder_equity=500000)
         assert ratio == 20.0  # 20%
 
     def test_return_on_equity_zero_equity(self):

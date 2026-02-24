@@ -3,24 +3,23 @@
 Abstracts SQLite and file system operations behind a clean API.
 """
 
-import json
 import hashlib
+import json
+from datetime import date
 from pathlib import Path
-from datetime import date, datetime
-from typing import Optional, List, Dict, Any
+from typing import Any
 
-from psx.storage.database import Database, get_database
 from psx.core.models import (
+    AnnouncementData,
     CompanyData,
-    QuoteData,
     EquityData,
     FinancialRow,
+    QuoteData,
     RatioRow,
-    AnnouncementData,
     ReportData,
     ScrapedData,
 )
-from psx.core.exceptions import DatabaseError
+from psx.storage.database import get_database
 
 
 class DataStore:
@@ -99,17 +98,13 @@ class DataStore:
         self.db.commit()
 
         # Get the company_id
-        cursor = self.db.execute(
-            "SELECT id FROM companies WHERE symbol = ?", (data.symbol,)
-        )
+        cursor = self.db.execute("SELECT id FROM companies WHERE symbol = ?", (data.symbol,))
         row = cursor.fetchone()
-        return row["id"]
+        return int(row["id"])
 
-    def get_company(self, symbol: str) -> Optional[CompanyData]:
+    def get_company(self, symbol: str) -> CompanyData | None:
         """Get company by symbol."""
-        cursor = self.db.execute(
-            "SELECT * FROM companies WHERE symbol = ?", (symbol,)
-        )
+        cursor = self.db.execute("SELECT * FROM companies WHERE symbol = ?", (symbol,))
         row = cursor.fetchone()
 
         if not row:
@@ -130,19 +125,15 @@ class DataStore:
             address=row["address"],
         )
 
-    def get_company_id(self, symbol: str) -> Optional[int]:
+    def get_company_id(self, symbol: str) -> int | None:
         """Get company ID by symbol."""
-        cursor = self.db.execute(
-            "SELECT id FROM companies WHERE symbol = ?", (symbol,)
-        )
+        cursor = self.db.execute("SELECT id FROM companies WHERE symbol = ?", (symbol,))
         row = cursor.fetchone()
         return row["id"] if row else None
 
-    def get_companies_by_sector(self, sector: str) -> List[CompanyData]:
+    def get_companies_by_sector(self, sector: str) -> list[CompanyData]:
         """Get all companies in a sector."""
-        cursor = self.db.execute(
-            "SELECT * FROM companies WHERE sector = ?", (sector,)
-        )
+        cursor = self.db.execute("SELECT * FROM companies WHERE sector = ?", (sector,))
 
         return [
             CompanyData(
@@ -162,7 +153,7 @@ class DataStore:
             for row in cursor.fetchall()
         ]
 
-    def list_companies(self) -> List[str]:
+    def list_companies(self) -> list[str]:
         """List all company symbols."""
         cursor = self.db.execute("SELECT symbol FROM companies ORDER BY symbol")
         return [row["symbol"] for row in cursor.fetchall()]
@@ -173,8 +164,8 @@ class DataStore:
         self,
         company_id: int,
         quote: QuoteData,
-        equity: Optional[EquityData] = None,
-        quote_date: Optional[date] = None,
+        equity: EquityData | None = None,
+        quote_date: date | None = None,
     ) -> None:
         """Save daily quote data."""
         quote_date = quote_date or date.today()
@@ -230,7 +221,7 @@ class DataStore:
         )
         self.db.commit()
 
-    def get_latest_quote(self, symbol: str) -> Optional[QuoteData]:
+    def get_latest_quote(self, symbol: str) -> QuoteData | None:
         """Get most recent quote for a company."""
         cursor = self.db.execute(
             """
@@ -264,9 +255,7 @@ class DataStore:
 
     # ========== FINANCIAL OPERATIONS ==========
 
-    def save_financials(
-        self, company_id: int, rows: List[FinancialRow]
-    ) -> None:
+    def save_financials(self, company_id: int, rows: list[FinancialRow]) -> None:
         """Save financial statement rows."""
         for row in rows:
             self.db.execute(
@@ -292,16 +281,16 @@ class DataStore:
     def get_financials(
         self,
         symbol: str,
-        period_type: Optional[str] = None,
-        metrics: Optional[List[str]] = None,
-    ) -> List[FinancialRow]:
+        period_type: str | None = None,
+        metrics: list[str] | None = None,
+    ) -> list[FinancialRow]:
         """Get financial data with optional filters."""
         sql = """
             SELECT f.* FROM financials f
             JOIN companies c ON f.company_id = c.id
             WHERE c.symbol = ?
         """
-        params: List[Any] = [symbol]
+        params: list[Any] = [symbol]
 
         if period_type:
             sql += " AND f.period_type = ?"
@@ -329,7 +318,7 @@ class DataStore:
 
     # ========== RATIO OPERATIONS ==========
 
-    def save_ratios(self, company_id: int, rows: List[RatioRow]) -> None:
+    def save_ratios(self, company_id: int, rows: list[RatioRow]) -> None:
         """Save financial ratio rows."""
         for row in rows:
             self.db.execute(
@@ -351,7 +340,7 @@ class DataStore:
             )
         self.db.commit()
 
-    def get_ratios(self, symbol: str) -> List[RatioRow]:
+    def get_ratios(self, symbol: str) -> list[RatioRow]:
         """Get all ratios for a company."""
         cursor = self.db.execute(
             """
@@ -380,9 +369,7 @@ class DataStore:
         content = f"{ann.date}|{ann.title}|{ann.url}"
         return hashlib.md5(content.encode()).hexdigest()
 
-    def save_announcement(
-        self, company_id: int, ann: AnnouncementData
-    ) -> None:
+    def save_announcement(self, company_id: int, ann: AnnouncementData) -> None:
         """Save announcement (with deduplication)."""
         content_hash = self._hash_announcement(ann)
 
@@ -407,18 +394,18 @@ class DataStore:
     def get_announcements(
         self,
         symbol: str,
-        category: Optional[str] = None,
-        start_date: Optional[str] = None,
-        end_date: Optional[str] = None,
+        category: str | None = None,
+        start_date: str | None = None,
+        end_date: str | None = None,
         limit: int = 100,
-    ) -> List[AnnouncementData]:
+    ) -> list[AnnouncementData]:
         """Get announcements with filters."""
         sql = """
             SELECT a.* FROM announcements a
             JOIN companies c ON a.company_id = c.id
             WHERE c.symbol = ?
         """
-        params: List[Any] = [symbol]
+        params: list[Any] = [symbol]
 
         if category:
             sql += " AND a.category = ?"
@@ -484,9 +471,9 @@ class DataStore:
             """,
             (company_id, report.report_type, report.period),
         )
-        return cursor.fetchone()["id"]
+        return int(cursor.fetchone()["id"])
 
-    def get_reports(self, symbol: str) -> List[ReportData]:
+    def get_reports(self, symbol: str) -> list[ReportData]:
         """Get all reports for a company."""
         cursor = self.db.execute(
             """
@@ -524,7 +511,7 @@ class DataStore:
 
         return file_path
 
-    def get_cache(self, symbol: str) -> Optional[Dict[str, Any]]:
+    def get_cache(self, symbol: str) -> dict[str, Any] | None:
         """Get cached data for a company."""
         file_path = self.cache_dir / symbol / "latest.json"
 
@@ -532,7 +519,7 @@ class DataStore:
             return None
 
         with open(file_path) as f:
-            return json.load(f)
+            return json.load(f)  # type: ignore[no-any-return]
 
     # ========== SCRAPE LOG ==========
 
@@ -541,8 +528,8 @@ class DataStore:
         symbol: str,
         source_url: str,
         status: str,
-        error_message: Optional[str] = None,
-        duration_ms: Optional[int] = None,
+        error_message: str | None = None,
+        duration_ms: int | None = None,
     ) -> None:
         """Log a scrape attempt."""
         company_id = self.get_company_id(symbol)
@@ -559,7 +546,7 @@ class DataStore:
 
     # ========== AGGREGATE QUERIES ==========
     # TODO: look into the calculation (see which info is useful for comparison analysis). also accuracy of output
-    def get_sector_averages(self, sector: str) -> Dict[str, Any]:
+    def get_sector_averages(self, sector: str) -> dict[str, Any]:
         """Get comprehensive average metrics for a sector.
 
         Returns averages, min/max ranges, and company count for sector benchmarking.
@@ -646,7 +633,7 @@ class DataStore:
 
     # ========== CONSOLIDATED SAVE OPERATIONS ==========
 
-    def save_scraped_data(self, data: ScrapedData) -> Optional[int]:
+    def save_scraped_data(self, data: ScrapedData) -> int | None:
         """Save all scraped data for a company in one operation.
 
         Consolidates saving company, quote, financials, ratios,
@@ -671,7 +658,7 @@ class DataStore:
         # Save financials (handle dict format: {period_type: [rows]})
         if data.financials:
             if isinstance(data.financials, dict):
-                for period_type, rows in data.financials.items():
+                for _period_type, rows in data.financials.items():
                     self.save_financials(company_id, rows)
             else:
                 # Handle list format
@@ -684,7 +671,7 @@ class DataStore:
         # Save announcements (handle dict format: {category: [anns]})
         if data.announcements:
             if isinstance(data.announcements, dict):
-                for category, anns in data.announcements.items():
+                for _category, anns in data.announcements.items():
                     for ann in anns:
                         self.save_announcement(company_id, ann)
             else:

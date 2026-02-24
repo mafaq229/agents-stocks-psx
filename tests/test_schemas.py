@@ -1,27 +1,26 @@
 """Tests for agent data schemas."""
 
-import pytest
 from datetime import datetime
 
 from psx.agents.schemas import (
-    PeerDataSnapshot,
-    DataAgentOutput,
-    ValuationDetail,
-    PeerComparison,
-    AnalystOutput,
-    NewsItem,
-    ResearchOutput,
-    AnalysisState,
     AnalysisReport,
+    AnalysisState,
+    AnalystOutput,
     ComparisonReport,
+    DataAgentOutput,
+    NewsItem,
+    PeerComparison,
+    PeerDataSnapshot,
+    ResearchOutput,
+    ValuationDetail,
 )
 from psx.core.models import (
-    QuoteData,
+    AnnouncementData,
     CompanyData,
     FinancialRow,
+    QuoteData,
     RatioRow,
     ReportData,
-    AnnouncementData,
 )
 
 
@@ -79,7 +78,9 @@ class TestDataAgentOutput:
             symbol="TEST",
             quote=QuoteData(price=100.0),
             company=CompanyData(symbol="TEST", name="Test Company"),
-            financials=[FinancialRow(period="2025", period_type="annual", metric="Revenue", value=1000.0)],
+            financials=[
+                FinancialRow(period="2025", period_type="annual", metric="Revenue", value=1000.0)
+            ],
             ratios=[RatioRow(period="2025", metric="PE", value=15.0)],
             reports=[ReportData(report_type="annual", period="2025", url="https://example.com")],
             announcements=[AnnouncementData(date="2025-01-15", title="Test")],
@@ -410,7 +411,9 @@ class TestAnalysisReport:
 
     def test_generated_at_auto_generated(self):
         """Test generated_at is auto-generated."""
-        report = AnalysisReport(query="test", symbols=["TEST"], recommendation="HOLD", confidence=0.5)
+        report = AnalysisReport(
+            query="test", symbols=["TEST"], recommendation="HOLD", confidence=0.5
+        )
         # Should be parseable ISO timestamp
         datetime.fromisoformat(report.generated_at)
 

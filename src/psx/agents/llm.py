@@ -4,10 +4,11 @@ Provides a unified interface for OpenAI and Anthropic APIs.
 """
 
 import json
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Any, Callable, Optional, Literal
+from typing import Any
 
-from psx.core.config import get_config, LLMProvider
+from psx.core.config import LLMProvider, get_config
 
 
 @dataclass
@@ -67,9 +68,9 @@ class LLMClient:
 
     def __init__(
         self,
-        provider: Optional[LLMProvider] = None,
-        model: Optional[str] = None,
-        api_key: Optional[str] = None,
+        provider: LLMProvider | None = None,
+        model: str | None = None,
+        api_key: str | None = None,
         temperature: float = 0.0,
         max_tokens: int = 4096,
     ):
@@ -89,10 +90,8 @@ class LLMClient:
         if self._openai_client is None:
             try:
                 from openai import OpenAI
-            except ImportError:
-                raise ImportError(
-                    "OpenAI package not installed. Run: uv add openai"
-                )
+            except ImportError as err:
+                raise ImportError("OpenAI package not installed. Run: uv add openai") from err
             self._openai_client = OpenAI(api_key=self.api_key)
         return self._openai_client
 
@@ -101,18 +100,16 @@ class LLMClient:
         if self._anthropic_client is None:
             try:
                 from anthropic import Anthropic
-            except ImportError:
-                raise ImportError(
-                    "Anthropic package not installed. Run: uv add anthropic"
-                )
+            except ImportError as err:
+                raise ImportError("Anthropic package not installed. Run: uv add anthropic") from err
             self._anthropic_client = Anthropic(api_key=self.api_key)
         return self._anthropic_client
 
     def chat(
         self,
         messages: list[dict[str, Any]],
-        tools: Optional[list[Tool]] = None,
-        system: Optional[str] = None,
+        tools: list[Tool] | None = None,
+        system: str | None = None,
     ) -> LLMResponse:
         """Send a chat completion request.
 
@@ -134,8 +131,8 @@ class LLMClient:
     def _chat_openai(
         self,
         messages: list[dict[str, Any]],
-        tools: Optional[list[Tool]] = None,
-        system: Optional[str] = None,
+        tools: list[Tool] | None = None,
+        system: str | None = None,
     ) -> LLMResponse:
         """OpenAI chat completion."""
         client = self._get_openai_client()
@@ -156,9 +153,7 @@ class LLMClient:
         # Some models (o-series, nano) don't support custom temperature
         # Only include temperature if not using these model types
         model_lower = self.model.lower()
-        supports_temperature = not any(
-            x in model_lower for x in ["o1", "o3", "nano", "o-"]
-        )
+        supports_temperature = not any(x in model_lower for x in ["o1", "o3", "nano", "o-"])
         if supports_temperature:
             kwargs["temperature"] = self.temperature
 
@@ -193,8 +188,8 @@ class LLMClient:
     def _chat_anthropic(
         self,
         messages: list[dict[str, Any]],
-        tools: Optional[list[Tool]] = None,
-        system: Optional[str] = None,
+        tools: list[Tool] | None = None,
+        system: str | None = None,
     ) -> LLMResponse:
         """Anthropic chat completion."""
         client = self._get_anthropic_client()
@@ -259,16 +254,18 @@ class LLMClient:
             if role == "tool":
                 # Anthropic expects tool_result as a content block
                 tool_call_id = msg.get("tool_call_id", "")
-                converted.append({
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "tool_result",
-                            "tool_use_id": tool_call_id,
-                            "content": content,
-                        }
-                    ],
-                })
+                converted.append(
+                    {
+                        "role": "user",
+                        "content": [
+                            {
+                                "type": "tool_result",
+                                "tool_use_id": tool_call_id,
+                                "content": content,
+                            }
+                        ],
+                    }
+                )
             elif role == "assistant" and "tool_calls" in msg:
                 # Convert assistant message with tool calls
                 content_blocks = []
@@ -276,12 +273,14 @@ class LLMClient:
                     content_blocks.append({"type": "text", "text": content})
 
                 for tc in msg["tool_calls"]:
-                    content_blocks.append({
-                        "type": "tool_use",
-                        "id": tc["id"],
-                        "name": tc["name"],
-                        "input": tc["arguments"],
-                    })
+                    content_blocks.append(
+                        {
+                            "type": "tool_use",
+                            "id": tc["id"],
+                            "name": tc["name"],
+                            "input": tc["arguments"],
+                        }
+                    )
 
                 converted.append({"role": "assistant", "content": content_blocks})
             else:
@@ -289,9 +288,7 @@ class LLMClient:
 
         return converted
 
-    def format_tool_result_message(
-        self, tool_call_id: str, result: str
-    ) -> dict[str, Any]:
+    def format_tool_result_message(self, tool_call_id: str, result: str) -> dict[str, Any]:
         """Format a tool result message for the conversation."""
         if self.provider == "openai":
             return {
@@ -333,7 +330,6 @@ class LLMClient:
                 "role": "assistant",
                 "content": content,
                 "tool_calls": [
-                    {"id": tc.id, "name": tc.name, "arguments": tc.arguments}
-                    for tc in tool_calls
+                    {"id": tc.id, "name": tc.name, "arguments": tc.arguments} for tc in tool_calls
                 ],
             }

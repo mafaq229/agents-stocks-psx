@@ -6,22 +6,19 @@ Coordinates Data, Analyst, and Research agents to produce comprehensive analysis
 import json
 import logging
 import re
-from typing import Any, Optional
+from typing import Any
 
-from psx.agents.llm import LLMClient, Tool
-from psx.agents.schemas import (
-    AnalysisState,
-    AnalysisReport,
-    DataAgentOutput,
-    AnalystOutput,
-    ResearchOutput,
-)
-from psx.agents.data_agent import DataAgent
 from psx.agents.analyst_agent import AnalystAgent
+from psx.agents.data_agent import DataAgent
+from psx.agents.llm import LLMClient
 from psx.agents.research_agent import ResearchAgent
-from psx.core.config import get_config, LLMProvider
+from psx.agents.schemas import (
+    AnalysisReport,
+    AnalysisState,
+    AnalystOutput,
+)
+from psx.core.config import LLMProvider, get_config
 from psx.core.prompts import get_prompt_registry
-
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +28,7 @@ class SupervisorAgent:
 
     def __init__(
         self,
-        llm_provider: Optional[LLMProvider] = None,
+        llm_provider: LLMProvider | None = None,
         max_iterations: int = 5,
     ):
         """Initialize supervisor with sub-agents.
@@ -114,7 +111,7 @@ class SupervisorAgent:
             return AnalysisReport(
                 query=query,
                 symbols=[],
-                summary="Could not identify any stock symbols in the query.",
+                reasoning="Could not identify any stock symbols in the query.",
                 recommendation="HOLD",
                 confidence=0.0,
             )
@@ -126,13 +123,17 @@ class SupervisorAgent:
 
             # Get next action from LLM
             next_action = self._plan_next_action(state)
-            logger.debug(f"[Supervisor] Planned action: {json.dumps(next_action, default=str)[:500]}")
+            logger.debug(
+                f"[Supervisor] Planned action: {json.dumps(next_action, default=str)[:500]}"
+            )
 
             if next_action.get("action") == "call_agent":
                 agent_type = next_action.get("agent", "unknown")
                 symbols = next_action.get("symbols", state.symbols)
                 task = next_action.get("task", "")
-                logger.info(f"[Supervisor] 📤 Delegating to {agent_type.upper()} agent for {symbols}")
+                logger.info(
+                    f"[Supervisor] 📤 Delegating to {agent_type.upper()} agent for {symbols}"
+                )
                 logger.debug(f"[Supervisor]    Task: {task[:200]}...")
                 self._execute_agent_call(state, next_action)
             elif next_action.get("action") == "synthesize":
@@ -152,7 +153,7 @@ class SupervisorAgent:
     def _extract_symbols(self, query: str) -> list[str]:
         """Extract stock symbols from query."""
         # Common PSX symbols pattern (3-6 uppercase letters)
-        pattern = r'\b([A-Z]{3,6})\b'
+        pattern = r"\b([A-Z]{3,6})\b"
         matches = re.findall(pattern, query.upper())
 
         # Filter out common words
@@ -180,9 +181,9 @@ class SupervisorAgent:
         # Parse response as JSON (usual workflow of the system)
         try:
             # Find JSON in response: searches of a substring that starts with { and ends with }
-            json_match = re.search(r'\{[\s\S]*\}', response.content) # re.Match object (not str)
+            json_match = re.search(r"\{[\s\S]*\}", response.content)  # re.Match object (not str)
             if json_match:
-                return json.loads(json_match.group()) # .group() returns the matched JSON
+                return json.loads(json_match.group())  # type: ignore[no-any-return]
         except json.JSONDecodeError:
             pass
 
@@ -201,9 +202,7 @@ class SupervisorAgent:
 
         return {"action": "done"}
 
-    def _execute_agent_call(
-        self, state: AnalysisState, action: dict[str, Any]
-    ) -> None:
+    def _execute_agent_call(self, state: AnalysisState, action: dict[str, Any]) -> None:
         """Execute an agent call and update state."""
         agent_type = action.get("agent", "")
         task = action.get("task", "")
@@ -211,41 +210,56 @@ class SupervisorAgent:
 
         for symbol in symbols:
             try:
+                result: Any = None
                 if agent_type == "data":
                     logger.info(f"[Supervisor] 📥 DataAgent fetching data for {symbol}")
                     result = self.data_agent.run(task or f"Get data for {symbol}")
                     state.data[symbol] = result
-                    logger.debug(f"[Supervisor] DataAgent returned data with keys: {list(vars(result).keys()) if hasattr(result, '__dict__') else 'N/A'}")
+                    logger.debug(
+                        f"[Supervisor] DataAgent returned data with keys: {list(vars(result).keys()) if hasattr(result, '__dict__') else 'N/A'}"
+                    )
 
                 elif agent_type == "research":
                     logger.info(f"[Supervisor] 📥 ResearchAgent researching {symbol}")
-                    context = {}
+                    context: dict[str, Any] = {}
                     company_name = symbol  # Default to symbol
                     if symbol in state.data:
                         data_output = state.data[symbol]
                         context["data"] = data_output
                         # Extract company name for better search
-                        if hasattr(data_output, 'company') and data_output.company:
-                            if hasattr(data_output.company, 'name') and data_output.company.name:
+                        if hasattr(data_output, "company") and data_output.company:
+                            if hasattr(data_output.company, "name") and data_output.company.name:
                                 company_name = data_output.company.name
-                            elif hasattr(data_output.company, 'description') and data_output.company.description:
+                            elif (
+                                hasattr(data_output.company, "description")
+                                and data_output.company.description
+                            ):
                                 # Use first sentence of description as company name context
                                 desc = data_output.company.description
-                                company_name = f"{symbol} ({desc[:100]}...)" if len(desc) > 100 else f"{symbol} ({desc})"
+                                company_name = (
+                                    f"{symbol} ({desc[:100]}...)"
+                                    if len(desc) > 100
+                                    else f"{symbol} ({desc})"
+                                )
 
                         # Pass sector for news context
-                        if hasattr(data_output, 'sector') and data_output.sector:
+                        if hasattr(data_output, "sector") and data_output.sector:
                             context["sector"] = data_output.sector
 
                     # TODO: add sector as well for general news. also see government regulations, market trends and economic factors affecting the sector
-                    research_task = task or f"Research news and reports for {company_name} (PSX symbol: {symbol})"
+                    research_task = (
+                        task
+                        or f"Research news and reports for {company_name} (PSX symbol: {symbol})"
+                    )
                     result = self.research_agent.run(
                         research_task,
                         context=context,
                     )
                     state.research[symbol] = result
-                    if hasattr(result, 'news_items'):
-                        logger.debug(f"[Supervisor] ResearchAgent found {len(result.news_items)} news items")
+                    if hasattr(result, "news_items"):
+                        logger.debug(
+                            f"[Supervisor] ResearchAgent found {len(result.news_items)} news items"
+                        )
 
                 elif agent_type == "analyst":
                     logger.info(f"[Supervisor] 📥 AnalystAgent analyzing {symbol}")
@@ -255,15 +269,17 @@ class SupervisorAgent:
                         context["data"] = data_output
 
                         # Include peer data for comparison
-                        if hasattr(data_output, 'peer_data') and data_output.peer_data:
+                        if hasattr(data_output, "peer_data") and data_output.peer_data:
                             context["peer_data"] = [
-                                p.to_dict() if hasattr(p, 'to_dict') else p
+                                p.to_dict() if hasattr(p, "to_dict") else p
                                 for p in data_output.peer_data
                             ]
-                            logger.debug(f"[Supervisor] Passing {len(data_output.peer_data)} peers to AnalystAgent")
+                            logger.debug(
+                                f"[Supervisor] Passing {len(data_output.peer_data)} peers to AnalystAgent"
+                            )
 
                         # Include sector averages for benchmarking
-                        if hasattr(data_output, 'sector_averages') and data_output.sector_averages:
+                        if hasattr(data_output, "sector_averages") and data_output.sector_averages:
                             context["sector_averages"] = data_output.sector_averages
                             logger.debug("[Supervisor] Passing sector averages to AnalystAgent")
 
@@ -276,16 +292,16 @@ class SupervisorAgent:
                         context=context,
                     )
                     state.analysis[symbol] = result
-                    if hasattr(result, 'recommendation'):
-                        logger.debug(f"[Supervisor] AnalystAgent recommendation: {result.recommendation}, confidence: {result.confidence}")
+                    if hasattr(result, "recommendation"):
+                        logger.debug(
+                            f"[Supervisor] AnalystAgent recommendation: {result.recommendation}, confidence: {result.confidence}"
+                        )
 
             except Exception as e:
                 logger.error(f"[Supervisor] ❌ Agent call failed for {symbol}: {e}")
                 state.errors.append(f"{agent_type} failed for {symbol}: {str(e)}")
 
-    def _create_report(
-        self, state: AnalysisState, synthesis: dict[str, Any]
-    ) -> AnalysisReport:
+    def _create_report(self, state: AnalysisState, synthesis: dict[str, Any]) -> AnalysisReport:
         """Create final analysis report using LLM synthesis."""
         # Determine overall recommendation from AnalystAgent outputs
         recommendations = []
@@ -293,7 +309,7 @@ class SupervisorAgent:
         fair_value = None
         margin_of_safety = None
 
-        for symbol, analysis in state.analysis.items():
+        for _symbol, analysis in state.analysis.items():
             if isinstance(analysis, AnalystOutput):
                 recommendations.append(analysis.recommendation)
                 confidences.append(analysis.confidence)
@@ -305,6 +321,7 @@ class SupervisorAgent:
         # Majority recommendation
         if recommendations:
             from collections import Counter
+
             recommendation = Counter(recommendations).most_common(1)[0][0]
             confidence = sum(confidences) / len(confidences) if confidences else 0.5
         else:
@@ -312,35 +329,43 @@ class SupervisorAgent:
             confidence = synthesis.get("confidence", 0.5)
 
         # Build context strings for LLM synthesis
-        data_context = "\n\n".join(
-            d.to_context_string() for d in state.data.values()
-        ) if state.data else "No data collected."
+        data_context = (
+            "\n\n".join(d.to_context_string() for d in state.data.values())
+            if state.data
+            else "No data collected."
+        )
 
-        research_context = "\n\n".join(
-            r.to_context_string() for r in state.research.values()
-        ) if state.research else "No research conducted."
+        research_context = (
+            "\n\n".join(r.to_context_string() for r in state.research.values())
+            if state.research
+            else "No research conducted."
+        )
 
-        analysis_context = "\n\n".join(
-            a.to_context_string() for a in state.analysis.values()
-        ) if state.analysis else "No analysis performed."
+        analysis_context = (
+            "\n\n".join(a.to_context_string() for a in state.analysis.values())
+            if state.analysis
+            else "No analysis performed."
+        )
 
         # Call LLM to synthesize comprehensive report (uses smart model)
         logger.info("[Supervisor] Calling synthesis LLM for comprehensive report")
         try:
             synthesis_response = self.synthesis_llm.chat(
-                messages=[{
-                    "role": "user",
-                    "content": self.synthesis_prompt.format(
-                        data_context=data_context,
-                        research_context=research_context,
-                        analysis_context=analysis_context,
-                    )
-                }],
+                messages=[
+                    {
+                        "role": "user",
+                        "content": self.synthesis_prompt.format(
+                            data_context=data_context,
+                            research_context=research_context,
+                            analysis_context=analysis_context,
+                        ),
+                    }
+                ],
                 system="You are a financial analyst creating investment reports. Respond only with valid JSON.",
             )
 
             # Parse synthesis JSON
-            json_match = re.search(r'\{[\s\S]*\}', synthesis_response.content)
+            json_match = re.search(r"\{[\s\S]*\}", synthesis_response.content)
             if json_match:
                 synth = json.loads(json_match.group())
             else:
@@ -364,11 +389,13 @@ class SupervisorAgent:
             for _, analysis in state.analysis.items():
                 if isinstance(analysis, AnalystOutput) and analysis.valuations:
                     for v in analysis.valuations:
-                        valuation_table.append({
-                            "method": v.method,
-                            "value": v.value,
-                            "inputs": v.notes or str(v.inputs),
-                        })
+                        valuation_table.append(
+                            {
+                                "method": v.method,
+                                "value": v.value,
+                                "inputs": v.notes or str(v.inputs),
+                            }
+                        )
 
         return AnalysisReport(
             query=state.query,

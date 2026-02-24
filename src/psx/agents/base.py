@@ -6,13 +6,13 @@ Provides the foundation for all specialized agents.
 import json
 import logging
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any, Callable, Optional
+from typing import Any
 
 from psx.agents.llm import LLMClient, Tool, ToolCall
-from psx.core.config import get_config, LLMProvider
+from psx.core.config import LLMProvider, get_config
 from psx.observability.metrics import get_metrics
-
 
 logger = logging.getLogger(__name__)
 
@@ -39,8 +39,8 @@ class BaseAgent:
         self,
         config: AgentConfig,
         tools: list[Tool],
-        llm_provider: Optional[LLMProvider] = None,
-        llm_model: Optional[str] = None,
+        llm_provider: LLMProvider | None = None,
+        llm_model: str | None = None,
     ):
         """Initialize the agent.
 
@@ -71,8 +71,8 @@ class BaseAgent:
     def run(
         self,
         task: str,
-        context: Optional[dict[str, Any]] = None,
-    ) -> dict[str, Any]:
+        context: dict[str, Any] | None = None,
+    ) -> Any:
         """Execute the agent on a task.
 
         Args:
@@ -95,23 +95,29 @@ class BaseAgent:
         # Add context if provided
         if context:
             context_str = self._format_context(context)
-            messages.append({
-                "role": "user",
-                "content": f"Context:\n{context_str}",
-            })
+            messages.append(
+                {
+                    "role": "user",
+                    "content": f"Context:\n{context_str}",
+                }
+            )
             logger.debug(f"[{self.config.name}] Context provided with keys: {list(context.keys())}")
 
         # Add the task
-        messages.append({
-            "role": "user",
-            "content": task,
-        })
+        messages.append(
+            {
+                "role": "user",
+                "content": task,
+            }
+        )
 
         # Agent loop
         iteration = 0
         while iteration < self.max_iterations:
             iteration += 1
-            logger.debug(f"[{self.config.name}] === Iteration {iteration}/{self.max_iterations} ===")
+            logger.debug(
+                f"[{self.config.name}] === Iteration {iteration}/{self.max_iterations} ==="
+            )
 
             # Get LLM response with timing
             metrics = get_metrics()
@@ -148,7 +154,7 @@ class BaseAgent:
                     f"Output may be incomplete or malformed."
                 )
                 # If content looks incomplete (e.g., truncated JSON), return error
-                if not response.content or response.content.strip().endswith((',', ':', '"', '{')):
+                if not response.content or response.content.strip().endswith((",", ":", '"', "{")):
                     return {
                         "error": "Response truncated due to max_tokens limit",
                         "partial_output": response.content,
@@ -157,12 +163,18 @@ class BaseAgent:
 
             # Log LLM reasoning if present
             if response.content:
-                preview = response.content[:500] + "..." if len(response.content) > 500 else response.content
+                preview = (
+                    response.content[:500] + "..."
+                    if len(response.content) > 500
+                    else response.content
+                )
                 logger.debug(f"[{self.config.name}] LLM reasoning: {preview}")
 
             # Check if we have tool calls to execute
             if response.has_tool_calls:
-                logger.debug(f"[{self.config.name}] Tool calls requested: {[tc.name for tc in response.tool_calls]}")
+                logger.debug(
+                    f"[{self.config.name}] Tool calls requested: {[tc.name for tc in response.tool_calls]}"
+                )
 
                 # Add assistant message with tool calls
                 messages.append(
@@ -174,7 +186,9 @@ class BaseAgent:
                 # Execute each tool call
                 for tool_call in response.tool_calls:
                     logger.info(f"[{self.config.name}] 🔧 Calling tool: {tool_call.name}")
-                    logger.debug(f"[{self.config.name}]    Arguments: {json.dumps(tool_call.arguments, default=str)[:500]}")
+                    logger.debug(
+                        f"[{self.config.name}]    Arguments: {json.dumps(tool_call.arguments, default=str)[:500]}"
+                    )
 
                     tool_start = time.time()
                     tool_error = None
@@ -205,18 +219,20 @@ class BaseAgent:
 
                     # Log result preview
                     result_preview = result[:1000] + "..." if len(result) > 1000 else result
-                    logger.debug(f"[{self.config.name}]    Result ({tool_latency_ms:.0f}ms): {result_preview}")
+                    logger.debug(
+                        f"[{self.config.name}]    Result ({tool_latency_ms:.0f}ms): {result_preview}"
+                    )
 
                     # Add tool result message
-                    messages.append(
-                        self.llm.format_tool_result_message(
-                            tool_call.id, result
-                        )
-                    )
+                    messages.append(self.llm.format_tool_result_message(tool_call.id, result))
             else:
                 # No tool calls - agent is done
                 logger.info(f"Agent '{self.config.name}' completed in {iteration} iterations")
-                output_preview = response.content[:500] + "..." if len(response.content) > 500 else response.content
+                output_preview = (
+                    response.content[:500] + "..."
+                    if len(response.content) > 500
+                    else response.content
+                )
                 logger.debug(f"[{self.config.name}] Final output: {output_preview}")
                 return self._parse_output(response.content)
 
@@ -300,9 +316,9 @@ class BaseAgent:
                 start = content.find("```json") + 7
                 end = content.find("```", start)
                 json_str = content[start:end].strip()
-                return json.loads(json_str)
+                return json.loads(json_str)  # type: ignore[no-any-return]
             elif content.strip().startswith("{"):
-                return json.loads(content)
+                return json.loads(content)  # type: ignore[no-any-return]
         except json.JSONDecodeError:
             pass
 
@@ -314,7 +330,7 @@ def create_tool(
     name: str,
     description: str,
     function: Callable[..., Any],
-    parameters: Optional[dict[str, Any]] = None,
+    parameters: dict[str, Any] | None = None,
 ) -> Tool:
     """Helper to create a Tool from a function.
 
@@ -341,15 +357,15 @@ def create_tool(
 
             param_type = "string"
             if param.annotation != inspect.Parameter.empty:
-                if param.annotation == int:
+                if param.annotation is int:
                     param_type = "integer"
-                elif param.annotation == float:
+                elif param.annotation is float:
                     param_type = "number"
-                elif param.annotation == bool:
+                elif param.annotation is bool:
                     param_type = "boolean"
-                elif param.annotation == list:
+                elif param.annotation is list:
                     param_type = "array"
-                elif param.annotation == dict:
+                elif param.annotation is dict:
                     param_type = "object"
 
             properties[param_name] = {"type": param_type}

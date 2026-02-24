@@ -1,12 +1,13 @@
 """Tests for Database class."""
 
-import pytest
-import tempfile
 import os
+import tempfile
 from pathlib import Path
 
-from psx.storage.database import Database, get_database, init_database
+import pytest
+
 from psx.core.exceptions import DatabaseError
+from psx.storage.database import Database, get_database, init_database
 
 
 class TestDatabase:
@@ -111,9 +112,7 @@ class TestDatabase:
 
     def test_get_schema_version_with_table(self, temp_db):
         """Test getting schema version when table exists."""
-        temp_db.execute(
-            "CREATE TABLE schema_version (version INTEGER PRIMARY KEY)"
-        )
+        temp_db.execute("CREATE TABLE schema_version (version INTEGER PRIMARY KEY)")
         temp_db.execute("INSERT INTO schema_version (version) VALUES (5)")
         temp_db.commit()
 
@@ -129,9 +128,7 @@ class TestDatabase:
     def test_run_migrations_creates_tables(self, temp_db_with_migrations):
         """Test that migrations create expected tables."""
         db = temp_db_with_migrations
-        cursor = db.execute(
-            "SELECT name FROM sqlite_master WHERE type='table'"
-        )
+        cursor = db.execute("SELECT name FROM sqlite_master WHERE type='table'")
         tables = {row["name"] for row in cursor.fetchall()}
 
         expected_tables = {
@@ -176,6 +173,7 @@ class TestGlobalDatabase:
             db_path = os.path.join(tmpdir, "test.db")
             # Reset global state
             import psx.storage.database as db_module
+
             db_module._db = None
 
             db = get_database(db_path)
@@ -194,6 +192,7 @@ class TestGlobalDatabase:
 
             # Reset global state
             import psx.storage.database as db_module
+
             db_module._db = None
 
             if migrations_dir.exists():

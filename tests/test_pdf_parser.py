@@ -1,13 +1,12 @@
 """Tests for PDF parser tool."""
 
-import pytest
 import tempfile
-import os
-from pathlib import Path
-from unittest.mock import patch, AsyncMock, MagicMock
+from unittest.mock import AsyncMock, patch
 
-from psx.tools.pdf_parser import PDFParser, ParsedReport, ParsedSection
+import pytest
+
 from psx.core.exceptions import PDFParseError
+from psx.tools.pdf_parser import ParsedReport, ParsedSection, PDFParser
 
 
 class TestPDFParser:
@@ -191,9 +190,7 @@ class TestPDFParser:
             source_url="https://example.com/report.pdf",
             pages=10,
             raw_text="Sample text",
-            sections={
-                "balance_sheet": ParsedSection(title="balance_sheet", raw_text="Assets...")
-            },
+            sections={"balance_sheet": ParsedSection(title="balance_sheet", raw_text="Assets...")},
             metadata={"title": "Annual Report"},
         )
         assert report.source_url == "https://example.com/report.pdf"
@@ -245,7 +242,9 @@ class TestPDFParser:
             raw_text="...",
             sections={
                 "notes": ParsedSection(title="notes", raw_text="Notes content"),
-                "income_statement": ParsedSection(title="income_statement", raw_text="Income content"),
+                "income_statement": ParsedSection(
+                    title="income_statement", raw_text="Income content"
+                ),
                 "balance_sheet": ParsedSection(title="balance_sheet", raw_text="Balance content"),
             },
         )
@@ -318,7 +317,9 @@ class TestPDFParserExtraction:
             with patch.object(parser, "extract_text_by_page", return_value=["Page 1", "Page 2"]):
                 with patch.object(parser, "get_metadata", return_value={"title": "Test Report"}):
                     with patch.object(parser, "identify_sections", return_value={}):
-                        report = parser.parse_from_bytes(b"mock pdf", source_url="https://example.com/test.pdf")
+                        report = parser.parse_from_bytes(
+                            b"mock pdf", source_url="https://example.com/test.pdf"
+                        )
 
         assert report.source_url == "https://example.com/test.pdf"
         assert report.pages == 2
